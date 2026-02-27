@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/start-with-worker.js --dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-with-worker.js",
+    "worker:ingestion": "node scripts/ingestion-worker.js",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

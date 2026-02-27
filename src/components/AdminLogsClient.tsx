@@ -38,7 +38,8 @@ type TabKey = "activity" | "runs" | "projects";
 
 function formatDate(value: string | null) {
   if (!value) return "-";
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
 export default function AdminLogsClient({

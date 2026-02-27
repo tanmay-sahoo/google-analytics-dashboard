@@ -49,6 +49,13 @@ Default admin:
 - Set `CRON_SECRET` in `.env` to secure cron endpoints.
 - When set, call cron endpoints with header `x-cron-secret: <CRON_SECRET>`.
 
+## VPS automatic scheduler
+- Run the ingestion worker alongside the app:
+- By default, `npm run start` now launches both the web server and the ingestion worker.
+- You can still run the worker alone with `npm run worker:ingestion`.
+- It polls ingestion settings every minute and triggers `POST /api/cron/ingest-metrics` when due.
+- Set `APP_BASE_URL` (or `NEXTAUTH_URL`) and `CRON_SECRET` in the environment.
+
 ## Logging
 - Admin logs are available at `/admin/logs` with tabs for activity, ingestion runs, and per-project fetches.
 

@@ -11,7 +11,11 @@ type IngestionSettings = {
 function formatDate(value: string | null) {
   if (!value) return "Never";
   const date = new Date(value);
-  return date.toLocaleString();
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function formatUtcDate(date: Date) {
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
 export default function AdminIngestionSettingsClient({
@@ -30,7 +34,7 @@ export default function AdminIngestionSettingsClient({
     if (!enabled) return "Disabled";
     if (!lastRunAt) return "After first run";
     const next = new Date(new Date(lastRunAt).getTime() + intervalMins * 60 * 1000);
-    return next.toLocaleString();
+    return formatUtcDate(next);
   }, [enabled, lastRunAt, intervalMins]);
 
   async function saveSettings() {
@@ -75,17 +79,19 @@ export default function AdminIngestionSettingsClient({
     <div className="card space-y-6">
       {message ? <div className="alert">{message}</div> : null}
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex items-center justify-between rounded-xl border border-slate/10 bg-white px-4 py-3 text-sm">
-          <span className="text-slate/70">Enable automatic ingestion</span>
+        <label className="flex items-center justify-between rounded-xl border border-slate/10 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/60">
+          <span className="text-slate/70 dark:text-slate-200">Enable automatic ingestion</span>
           <button
             type="button"
-            className={`relative h-6 w-11 rounded-full transition ${
-              enabled ? "bg-emerald-500" : "bg-slate/30"
+            className={`relative h-6 w-11 rounded-full border transition ${
+              enabled
+                ? "bg-emerald-500 border-emerald-400/60"
+                : "bg-slate-300 border-slate-400 dark:bg-slate-500 dark:border-slate-200"
             }`}
             onClick={() => setEnabled((current) => !current)}
           >
             <span
-              className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
+              className={`absolute left-1 top-1 h-4 w-4 rounded-full border border-slate-300 bg-white shadow transition dark:border-slate-200 dark:bg-slate-50 ${
                 enabled ? "translate-x-5" : "translate-x-0"
               }`}
             />
