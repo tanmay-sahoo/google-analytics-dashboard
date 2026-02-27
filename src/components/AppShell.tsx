@@ -22,6 +22,7 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div
@@ -36,6 +37,8 @@ export default function AppShell({
           name={name}
           email={email}
           locale={locale}
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((value) => !value)}
         />
         <div className="flex flex-1 flex-col">
           <Topbar locale={locale} theme={theme} onMenuClick={() => setMobileOpen(true)} />
@@ -49,29 +52,29 @@ export default function AppShell({
             className="absolute inset-0 bg-slate/40 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-slate/10 bg-white/95 px-6 py-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Menu</div>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => setMobileOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-6 flex flex-1 flex-col">
-              <SidebarContent
-                role={role}
-                menuAccess={menuAccess}
-                name={name}
-                email={email}
-                locale={locale}
-                onNavigate={() => setMobileOpen(false)}
-              />
+            <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-slate/10 bg-white/95 px-6 py-6 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Menu</div>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-6 flex flex-1 flex-col">
+                <SidebarContent
+                  role={role}
+                  menuAccess={menuAccess}
+                  name={name}
+                  email={email}
+                  locale={locale}
+                  onNavigate={() => setMobileOpen(false)}
+                />
+              </div>
             </div>
           </div>
-        </div>
       ) : null}
     </div>
   );

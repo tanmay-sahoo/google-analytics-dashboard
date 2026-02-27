@@ -69,6 +69,10 @@ export default async function ProjectDetailPage({
   const reportEnd = new Date();
   const reportStart = addDays(reportEnd, -29);
 
+  function formatRate(value: number) {
+    return `${(value * 100).toFixed(1)}%`;
+  }
+
   function formatDuration(seconds: number) {
     const total = Math.round(seconds);
     const minutes = Math.floor(total / 60);
@@ -103,12 +107,14 @@ export default async function ProjectDetailPage({
         startDate: formatDateShort(reportStart),
         endDate: formatDateShort(reportEnd)
       });
-    } catch {
+    } catch (error) {
       campaigns = [];
       sources = [];
       devices = [];
       reports = null;
-      reportsError = "Failed to fetch GA4 reports. Check GA4 permissions and API access.";
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("GA4 reports fetch failed:", message);
+      reportsError = `Failed to fetch GA4 reports. ${message}`;
     }
   }
 
@@ -187,20 +193,20 @@ export default async function ProjectDetailPage({
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="card">
-              <div className="label">Avg engagement time</div>
-              <div className="kpi">{formatDuration(reports.engagement.avgEngagementTime)}</div>
+              <div className="label">Engagement rate</div>
+              <div className="kpi">{formatRate(reports.engagement.engagementRate)}</div>
             </div>
             <div className="card">
-              <div className="label">Event count</div>
-              <div className="kpi">{formatNumber(reports.summary.eventCount)}</div>
+              <div className="label">Bounce rate</div>
+              <div className="kpi">{formatRate(reports.engagement.bounceRate)}</div>
             </div>
             <div className="card">
-              <div className="label">Page views</div>
-              <div className="kpi">{formatNumber(reports.engagement.pageViews)}</div>
+              <div className="label">Avg session duration</div>
+              <div className="kpi">{formatDuration(reports.engagement.averageSessionDuration)}</div>
             </div>
             <div className="card">
-              <div className="label">Ecommerce purchases</div>
-              <div className="kpi">{formatNumber(reports.summary.ecommercePurchases)}</div>
+              <div className="label">Sessions per user</div>
+              <div className="kpi">{reports.engagement.sessionsPerUser.toFixed(2)}</div>
             </div>
           </div>
 
@@ -222,6 +228,24 @@ export default async function ProjectDetailPage({
               }
             />
           </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Table
+              headers={["Least visited pages", "Views"]}
+              rows={
+                reports.leastPages.length
+                  ? reports.leastPages.map((row) => [row.label, formatNumber(row.value)])
+                  : [["No data", "-"]]
+              }
+            />
+            <Table
+              headers={["Search terms", "Sessions"]}
+              rows={
+                reports.searchTerms.length
+                  ? reports.searchTerms.map((row) => [row.label, formatNumber(row.value)])
+                  : [["No data", "-"]]
+              }
+            />
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="card">
@@ -229,12 +253,12 @@ export default async function ProjectDetailPage({
               <div className="kpi">{formatCurrency(reports.summary.totalRevenue, project.currency)}</div>
             </div>
             <div className="card">
-              <div className="label">Purchase revenue</div>
-              <div className="kpi">{formatCurrency(reports.summary.purchaseRevenue, project.currency)}</div>
+              <div className="label">Conversions</div>
+              <div className="kpi">{formatNumber(reports.summary.conversions)}</div>
             </div>
             <div className="card">
-              <div className="label">Ecommerce purchases</div>
-              <div className="kpi">{formatNumber(reports.summary.ecommercePurchases)}</div>
+              <div className="label">Page views</div>
+              <div className="kpi">{formatNumber(reports.engagement.pageViews)}</div>
             </div>
           </div>
 

@@ -161,7 +161,8 @@ async function runTopReport({
   metric,
   limit,
   startDate,
-  endDate
+  endDate,
+  order = "desc"
 }: {
   propertyId: string;
   refreshToken: string;
@@ -170,6 +171,7 @@ async function runTopReport({
   limit: number;
   startDate: string;
   endDate: string;
+  order?: "asc" | "desc";
 }): Promise<Ga4TopItem[]> {
   const authClient = getOAuthClient();
   authClient.setCredentials({ refresh_token: refreshToken });
@@ -181,7 +183,7 @@ async function runTopReport({
       dateRanges: [{ startDate, endDate }],
       metrics: [{ name: metric }],
       dimensions: [{ name: dimension }],
-      orderBys: [{ desc: true, metric: { metricName: metric } }],
+      orderBys: [{ desc: order === "desc", metric: { metricName: metric } }],
       limit
     }
   });
@@ -349,7 +351,22 @@ export async function fetchGa4ProjectReports({
   startDate: string;
   endDate: string;
 }) {
-  const [summary, engagement, acquisitionUsers, acquisitionSessions, topPages, topEvents, retentionSeries] =
+  const [
+    summary,
+    engagement,
+    acquisitionUsers,
+    acquisitionSessions,
+    topPages,
+    topEvents,
+    retentionSeries,
+    platform,
+    operatingSystem,
+    browser,
+    deviceCategory,
+    platformDevice,
+    leastPages,
+    searchTerms
+  ] =
     await Promise.all([
       runSummaryReport({
         propertyId,
@@ -357,12 +374,11 @@ export async function fetchGa4ProjectReports({
         metrics: [
           "activeUsers",
           "newUsers",
-          "returningUsers",
+          "totalUsers",
           "sessions",
           "eventCount",
           "totalRevenue",
-          "purchaseRevenue",
-          "ecommercePurchases"
+          "conversions"
         ],
         startDate,
         endDate
@@ -370,14 +386,14 @@ export async function fetchGa4ProjectReports({
       runSummaryReport({
         propertyId,
         refreshToken,
-        metrics: ["averageEngagementTime", "screenPageViews"],
+        metrics: ["engagementRate", "bounceRate", "averageSessionDuration", "sessionsPerUser", "screenPageViews"],
         startDate,
         endDate
       }),
       runTopReport({
         propertyId,
         refreshToken,
-        dimension: "firstUserDefaultChannelGroup",
+        dimension: "firstUserSourceMedium",
         metric: "newUsers",
         limit: 8,
         startDate,
@@ -386,7 +402,7 @@ export async function fetchGa4ProjectReports({
       runTopReport({
         propertyId,
         refreshToken,
-        dimension: "sessionDefaultChannelGroup",
+        dimension: "sessionSourceMedium",
         metric: "sessions",
         limit: 8,
         startDate,
@@ -395,7 +411,7 @@ export async function fetchGa4ProjectReports({
       runTopReport({
         propertyId,
         refreshToken,
-        dimension: "pageTitle",
+        dimension: "pagePath",
         metric: "screenPageViews",
         limit: 8,
         startDate,
@@ -413,37 +429,240 @@ export async function fetchGa4ProjectReports({
       runSeriesReport({
         propertyId,
         refreshToken,
-        metrics: ["newUsers", "returningUsers"],
+        metrics: ["newUsers", "totalUsers"],
         dimension: "date",
         startDate,
         endDate
-      })
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "platform",
+        metric: "activeUsers",
+        limit: 8,
+        startDate,
+        endDate
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "operatingSystem",
+        metric: "activeUsers",
+        limit: 8,
+        startDate,
+        endDate
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "browser",
+        metric: "activeUsers",
+        limit: 8,
+        startDate,
+        endDate
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "deviceCategory",
+        metric: "activeUsers",
+        limit: 8,
+        startDate,
+        endDate
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "platformDeviceCategory",
+        metric: "activeUsers",
+        limit: 8,
+        startDate,
+        endDate
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "pagePath",
+        metric: "screenPageViews",
+        limit: 8,
+        startDate,
+        endDate,
+        order: "asc"
+      }),
+      runTopReport({
+        propertyId,
+        refreshToken,
+        dimension: "searchTerm",
+        metric: "sessions",
+        limit: 8,
+        startDate,
+        endDate
+      }),
     ]);
 
   return {
     summary: {
       activeUsers: summary.metrics[0] ?? 0,
       newUsers: summary.metrics[1] ?? 0,
-      returningUsers: summary.metrics[2] ?? 0,
+      returningUsers: Math.max(0, (summary.metrics[2] ?? 0) - (summary.metrics[1] ?? 0)),
       sessions: summary.metrics[3] ?? 0,
       eventCount: summary.metrics[4] ?? 0,
       totalRevenue: summary.metrics[5] ?? 0,
-      purchaseRevenue: summary.metrics[6] ?? 0,
-      ecommercePurchases: summary.metrics[7] ?? 0
+      conversions: summary.metrics[6] ?? 0
     },
     engagement: {
-      avgEngagementTime: engagement.metrics[0] ?? 0,
-      pageViews: engagement.metrics[1] ?? 0
+      engagementRate: engagement.metrics[0] ?? 0,
+      bounceRate: engagement.metrics[1] ?? 0,
+      averageSessionDuration: engagement.metrics[2] ?? 0,
+      sessionsPerUser: engagement.metrics[3] ?? 0,
+      pageViews: engagement.metrics[4] ?? 0
     },
     acquisitionUsers,
     acquisitionSessions,
     topPages,
     topEvents,
+    leastPages,
+    searchTerms,
     retention: {
       dates: retentionSeries.dates,
       newUsers: retentionSeries.series[0] ?? [],
-      returningUsers: retentionSeries.series[1] ?? []
+      returningUsers:
+        retentionSeries.series[1]?.map((total, index) =>
+          Math.max(0, total - (retentionSeries.series[0]?.[index] ?? 0))
+        ) ?? []
+    },
+    tech: {
+      platform,
+      operatingSystem,
+      browser,
+      deviceCategory,
+      platformDevice
     }
+  };
+}
+
+export async function fetchGa4ReportDetail({
+  propertyId,
+  refreshToken,
+  dimension,
+  metric,
+  startDate,
+  endDate,
+  limit = 100,
+  order = "desc"
+}: {
+  propertyId: string;
+  refreshToken: string;
+  dimension: string;
+  metric: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+  order?: "asc" | "desc";
+}) {
+  return runTopReport({
+    propertyId,
+    refreshToken,
+    dimension,
+    metric,
+    limit,
+    startDate,
+    endDate,
+    order
+  });
+}
+
+export async function fetchGa4EcommerceReport({
+  propertyId,
+  refreshToken,
+  startDate,
+  endDate,
+  limit = 100
+}: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+}) {
+  const authClient = getOAuthClient();
+  authClient.setCredentials({ refresh_token: refreshToken });
+  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
+
+  async function runItemMetric(metricName: string) {
+    try {
+      const response = await analyticsData.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          metrics: [{ name: metricName }],
+          dimensions: [{ name: "itemName" }],
+          orderBys: [{ desc: true, metric: { metricName } }],
+          limit
+        }
+      });
+      const rows = response.data.rows ?? [];
+      const values = new Map<string, number>();
+      rows.forEach((row) => {
+        const label = row.dimensionValues?.[0]?.value ?? "-";
+        const value = Number(row.metricValues?.[0]?.value ?? 0);
+        values.set(label, value);
+      });
+      return values;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  try {
+    const itemViews =
+      (await runItemMetric("itemViews")) ??
+      (await runItemMetric("itemViewEvents")) ??
+      new Map<string, number>();
+    const itemsAddedToCart = (await runItemMetric("itemsAddedToCart")) ?? new Map<string, number>();
+    const itemsPurchased = (await runItemMetric("itemsPurchased")) ?? new Map<string, number>();
+    const itemRevenue = (await runItemMetric("itemRevenue")) ?? new Map<string, number>();
+
+    const labels = new Set<string>();
+    [itemViews, itemsAddedToCart, itemsPurchased, itemRevenue].forEach((map) => {
+      map.forEach((_value, key) => labels.add(key));
+    });
+
+    const mapped = Array.from(labels).map((label) => ({
+      label,
+      values: [
+        itemViews.get(label) ?? 0,
+        itemsAddedToCart.get(label) ?? 0,
+        itemsPurchased.get(label) ?? 0,
+        itemRevenue.get(label) ?? 0
+      ]
+    }));
+
+    mapped.sort((left, right) => {
+      const purchasedDiff = (right.values[2] ?? 0) - (left.values[2] ?? 0);
+      if (purchasedDiff !== 0) {
+        return purchasedDiff;
+      }
+      return (right.values[0] ?? 0) - (left.values[0] ?? 0);
+    });
+
+    const hasValues = mapped.some((row) => row.values.some((value) => value > 0));
+    if (hasValues) {
+      return {
+        rows: mapped,
+        warning: null as string | null,
+        mode: "items" as const
+      };
+    }
+  } catch (error) {
+    // Ignore errors here and return an empty item-level response below.
+  }
+
+  return {
+    rows: [],
+    warning:
+      "Item-level ecommerce metrics are not available for this property or date range.",
+    mode: "items" as const
   };
 }
 

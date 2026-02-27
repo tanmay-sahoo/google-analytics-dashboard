@@ -10,12 +10,14 @@ export default function SidebarUserMenu({
   name,
   email,
   locale,
-  onLocaleChange
+  onLocaleChange,
+  compact = false
 }: {
   name?: string | null;
   email?: string | null;
   locale?: string;
   onLocaleChange?: (value: string) => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [lang, setLang] = useState(locale ?? "en");
@@ -96,15 +98,21 @@ export default function SidebarUserMenu({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-3 rounded-2xl border border-slate/10 bg-white/80 px-3 py-3 text-left text-sm"
+        className={`flex items-center gap-3 rounded-2xl border border-slate/10 bg-white/80 px-3 py-3 text-left text-sm ${
+          compact ? "w-12 justify-center px-0" : "w-full"
+        }`}
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate/10 text-sm font-semibold text-slate">
           {initial}
         </span>
-        <span className="flex-1">
-          <span className="block font-semibold text-slate">{name ?? "User"}</span>
-        </span>
-        <span className="text-xs text-slate/40">▾</span>
+        {!compact ? (
+          <>
+            <span className="flex-1">
+              <span className="block font-semibold text-slate">{name ?? "User"}</span>
+            </span>
+            <span className="text-xs text-slate/40">▾</span>
+          </>
+        ) : null}
       </button>
 
       {open ? (

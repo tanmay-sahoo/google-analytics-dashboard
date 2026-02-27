@@ -1,7 +1,9 @@
 ﻿export const translations = {
   en: {
     dashboard: "Dashboard",
+    projectMenu: "Project",
     projects: "Projects",
+    reports: "Reports",
     alerts: "Alerts",
     adminUsers: "Users",
     adminIntegrations: "Integrations",
@@ -17,8 +19,10 @@
     appTitle: "Marketing Data Hub"
   },
   de: {
+    projectMenu: "Projekt",
     dashboard: "Übersicht",
     projects: "Projekte",
+    reports: "Berichte",
     alerts: "Alarme",
     adminUsers: "Benutzer",
     adminIntegrations: "Integrationen",

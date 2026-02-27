@@ -68,8 +68,11 @@ export async function GET(
   lines.push(`Sessions,${reports.summary.sessions}`);
   lines.push(`Event count,${reports.summary.eventCount}`);
   lines.push(`Total revenue,${reports.summary.totalRevenue}`);
-  lines.push(`Purchase revenue,${reports.summary.purchaseRevenue}`);
-  lines.push(`Ecommerce purchases,${reports.summary.ecommercePurchases}`);
+  lines.push(`Conversions,${reports.summary.conversions}`);
+  lines.push(`Engagement rate,${reports.engagement.engagementRate}`);
+  lines.push(`Bounce rate,${reports.engagement.bounceRate}`);
+  lines.push(`Average session duration,${reports.engagement.averageSessionDuration}`);
+  lines.push(`Sessions per user,${reports.engagement.sessionsPerUser}`);
   lines.push("");
   lines.push("User acquisition,New users");
   reports.acquisitionUsers.forEach((row) => {
@@ -88,6 +91,16 @@ export async function GET(
   lines.push("");
   lines.push("Top pages,Views");
   reports.topPages.forEach((row) => {
+    lines.push(`${csvEscape(row.label)},${row.value}`);
+  });
+  lines.push("");
+  lines.push("Least visited pages,Views");
+  reports.leastPages.forEach((row) => {
+    lines.push(`${csvEscape(row.label)},${row.value}`);
+  });
+  lines.push("");
+  lines.push("Search terms,Sessions");
+  reports.searchTerms.forEach((row) => {
     lines.push(`${csvEscape(row.label)},${row.value}`);
   });
 
