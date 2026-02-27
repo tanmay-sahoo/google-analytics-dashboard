@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 
@@ -21,6 +21,7 @@ export default function AdminIntegrationsClient({
   const [ga4Properties, setGa4Properties] = useState<Ga4Property[]>([]);
   const [adsCustomers, setAdsCustomers] = useState<AdsCustomer[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedGa4, setSelectedGa4] = useState<Set<string>>(new Set());
 
   async function loadGa4() {
     setMessage(null);
@@ -38,11 +39,20 @@ export default function AdminIntegrationsClient({
     }
     const data = await response.json();
     setGa4Properties(data.properties ?? []);
+    setSelectedGa4(new Set());
   }
 
   async function importGa4Projects() {
     setMessage(null);
-    const response = await fetch("/api/integrations/ga4/import", { method: "POST" });
+    const body =
+      selectedGa4.size > 0
+        ? JSON.stringify({ propertyIds: Array.from(selectedGa4) })
+        : null;
+    const response = await fetch("/api/integrations/ga4/import", {
+      method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body
+    });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       setMessage(data.error ?? "Failed to import GA4 projects");
@@ -51,6 +61,8 @@ export default function AdminIntegrationsClient({
     const data = await response.json();
     setMessage(`Imported ${data.created} projects (${data.skipped} skipped).`);
   }
+
+  const allSelected = ga4Properties.length > 0 && selectedGa4.size === ga4Properties.length;
 
   async function loadAds() {
     setMessage(null);
@@ -94,18 +106,50 @@ export default function AdminIntegrationsClient({
               Fetch properties
             </button>
             <button className="btn-outline" type="button" onClick={importGa4Projects}>
-              Import as projects
+              {selectedGa4.size > 0 ? "Import selected" : "Import as projects"}
             </button>
           </div>
           {ga4Properties.length ? (
             <div className="mt-3 space-y-2 text-sm">
+              <label className="flex items-center gap-2 text-xs text-slate/60">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      setSelectedGa4(new Set(ga4Properties.map((prop) => prop.id)));
+                    } else {
+                      setSelectedGa4(new Set());
+                    }
+                  }}
+                />
+                Select all
+              </label>
               {ga4Properties.map((prop) => (
-                <div key={prop.id} className="rounded-xl border border-slate/10 bg-white px-3 py-2">
-                  <div className="font-semibold text-slate">{prop.displayName}</div>
-                  <div className="text-xs text-slate/60">
-                    Account: {prop.accountName ?? prop.accountId ?? "-"} · Property ID: {prop.id}
+                <label
+                  key={prop.id}
+                  className="flex items-start gap-3 rounded-xl border border-slate/10 bg-white px-3 py-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedGa4.has(prop.id)}
+                    onChange={(event) => {
+                      const next = new Set(selectedGa4);
+                      if (event.target.checked) {
+                        next.add(prop.id);
+                      } else {
+                        next.delete(prop.id);
+                      }
+                      setSelectedGa4(next);
+                    }}
+                  />
+                  <div>
+                    <div className="font-semibold text-slate">{prop.displayName}</div>
+                    <div className="text-xs text-slate/60">
+                      Account: {prop.accountName ?? prop.accountId ?? "-"} . Property ID: {prop.id}
+                    </div>
                   </div>
-                </div>
+                </label>
               ))}
             </div>
           ) : null}

@@ -6,7 +6,7 @@ import { listGa4Properties } from "@/lib/ga4-admin";
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
 const DEFAULT_CURRENCY = "INR";
 
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -21,10 +21,23 @@ export async function POST() {
   }
 
   const properties = await listGa4Properties(integration.refreshToken);
+  let requestedIds: string[] | null = null;
+  try {
+    const payload = await request.json();
+    if (Array.isArray(payload?.propertyIds) && payload.propertyIds.length > 0) {
+      requestedIds = payload.propertyIds.map((id: unknown) => String(id));
+    }
+  } catch {
+    requestedIds = null;
+  }
+
+  const selectedProperties = requestedIds
+    ? properties.filter((prop) => requestedIds!.includes(prop.id))
+    : properties;
   let created = 0;
   let skipped = 0;
 
-  for (const prop of properties) {
+  for (const prop of selectedProperties) {
     const existing = await prisma.dataSourceAccount.findFirst({
       where: { type: "GA4", externalId: prop.id }
     });

@@ -1,7 +1,7 @@
-﻿import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import ProjectsListClient from "@/components/ProjectsListClient";
 
 export default async function ProjectsPage() {
   const session = await getServerSession(authOptions);
@@ -22,16 +22,7 @@ export default async function ProjectsPage() {
         <h1 className="page-title">Projects</h1>
         <p className="text-sm text-slate/60">Open a project to configure data sources and metrics.</p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {projects.map((project) => (
-          <Link key={project.id} href={`/projects/${project.id}`} className="card">
-            <div className="text-lg font-semibold">{project.name}</div>
-            <div className="mt-2 text-xs uppercase tracking-[0.2em] text-slate/50">
-              {project.timezone} - {project.currency}
-            </div>
-          </Link>
-        ))}
-      </div>
+      <ProjectsListClient projects={projects} canDelete={user.role === "ADMIN"} />
     </div>
   );
 }

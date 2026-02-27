@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { addDays, formatDateShort } from "@/lib/time";
-import { fetchGa4ReportDetail } from "@/lib/ga4";
+import { fetchGa4EcommerceReport, fetchGa4ReportDetail } from "@/lib/ga4";
 import { getOrRefreshReport } from "@/lib/report-cache";
 import { reportDetailMap } from "@/lib/report-config";
 import ReportsFilters from "@/components/ReportsFilters";
@@ -54,9 +54,6 @@ export default async function ReportsDetailPage({
 
   const reportKey = params.key;
   const report = reportMap[reportKey];
-  if (!report) {
-    return <div className="alert">Report not found.</div>;
-  }
 
   const rangeKey = searchParams?.range ?? "last30";
   const refresh = searchParams?.refresh === "1";
@@ -74,44 +71,68 @@ export default async function ReportsDetailPage({
   const ga4Integration = await prisma.integrationSetting.findUnique({ where: { type: "GA4" } });
 
   let rows: { label: string; value: number }[] = [];
+  let ecommerceRows: { label: string; values: number[] }[] = [];
+  let ecommerceError: string | null = null;
   let errorMessage: string | null = null;
 
   if (ga4Integration?.refreshToken && ga4Source?.externalId) {
-    try {
-      rows = await getOrRefreshReport({
-        projectId: project.id,
-        reportKey: `detail:${reportKey}`,
-        rangeStart: reportStart,
-        rangeEnd: reportEnd,
-        fetcher: () =>
-          fetchGa4ReportDetail({
-            propertyId: ga4Source.externalId!,
-            refreshToken: ga4Integration.refreshToken!,
-            dimension: report.dimension,
-            metric: report.metric,
-            order: report.order ?? "desc",
-            startDate: formatDateShort(reportStart),
-            endDate: formatDateShort(reportEnd),
-            limit: 100
-          }),
-        force: refresh
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("GA4 detail fetch failed:", message);
-      errorMessage = `Failed to fetch GA4 report. ${message}`;
+    if (reportKey === "ecommerce-purchases") {
+      try {
+        const ecommerceData = await getOrRefreshReport({
+          projectId: project.id,
+          reportKey: "detail:ecommerce-purchases:v2",
+          rangeStart: reportStart,
+          rangeEnd: reportEnd,
+          fetcher: () =>
+            fetchGa4EcommerceReport({
+              propertyId: ga4Source.externalId!,
+              refreshToken: ga4Integration.refreshToken!,
+              startDate: formatDateShort(reportStart),
+              endDate: formatDateShort(reportEnd),
+              limit: 100
+            }),
+          force: refresh
+        });
+        ecommerceRows = ecommerceData.rows ?? [];
+        ecommerceError = ecommerceRows.length
+          ? null
+          : "Item-level ecommerce metrics are not available for this property or date range.";
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        console.error("GA4 ecommerce fetch failed:", message);
+        ecommerceError = `Failed to fetch GA4 report. ${message}`;
+      }
+    } else if (report) {
+      try {
+        rows = await getOrRefreshReport({
+          projectId: project.id,
+          reportKey: `detail:${reportKey}`,
+          rangeStart: reportStart,
+          rangeEnd: reportEnd,
+          fetcher: () =>
+            fetchGa4ReportDetail({
+              propertyId: ga4Source.externalId!,
+              refreshToken: ga4Integration.refreshToken!,
+              dimension: report.dimension,
+              metric: report.metric,
+              order: report.order ?? "desc",
+              startDate: formatDateShort(reportStart),
+              endDate: formatDateShort(reportEnd),
+              limit: 100
+            }),
+          force: refresh
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        console.error("GA4 detail fetch failed:", message);
+        errorMessage = `Failed to fetch GA4 report. ${message}`;
+      }
+    } else {
+      errorMessage = "Report not found.";
     }
   } else {
     errorMessage = "Connect GA4 to view reports.";
   }
-
-  const refreshParams = new URLSearchParams({
-    projectId: project.id,
-    range: rangeKey,
-    start: formatDateShort(reportStart),
-    end: formatDateShort(reportEnd),
-    refresh: "1"
-  });
 
   return (
     <div className="space-y-8">
@@ -127,7 +148,9 @@ export default async function ReportsDetailPage({
 
       <div className="section-header">
         <div>
-          <h2 className="text-lg font-semibold">{report.title}</h2>
+          <h2 className="text-lg font-semibold">
+            {report?.title ?? "E-commerce purchases"}
+          </h2>
           <p className="text-sm text-slate/60">
             {formatDateShort(reportStart)} - {formatDateShort(reportEnd)}
           </p>
@@ -136,6 +159,23 @@ export default async function ReportsDetailPage({
 
       {errorMessage ? (
         <div className="alert">{errorMessage}</div>
+      ) : reportKey === "ecommerce-purchases" ? (
+        ecommerceError ? (
+          <div className="alert">{ecommerceError}</div>
+        ) : (
+          <ReportsDataTable
+            title="E-commerce purchases"
+            dimensionLabel="Item name"
+            columns={[
+              { label: "Items viewed" },
+              { label: "Items added to cart" },
+              { label: "Items purchased" },
+              { label: "Item revenue", formatType: "currency" }
+            ]}
+            rows={ecommerceRows.map((row) => ({ label: row.label, values: row.values }))}
+            currency={project.currency}
+          />
+        )
       ) : (
         <ReportsDataTable
           title={report!.title}
