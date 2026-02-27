@@ -49,6 +49,12 @@ enum AlertStatus {
   MUTED
 }
 
+enum IngestionStatus {
+  STARTED
+  COMPLETED
+  FAILED
+}
+
 model User {
   id           String       @id @default(cuid())
   name         String?
@@ -63,6 +69,7 @@ model User {
   createdAt    DateTime     @default(now())
   projectUsers ProjectUser[]
   createdRules AlertRule[]  @relation("CreatedRules")
+  activityLogs ActivityLog[]
 
   createdBy    User?        @relation("UserCreator", fields: [createdById], references: [id])
   createdUsers User[]       @relation("UserCreator")
@@ -78,6 +85,7 @@ model Project {
   dataSources   DataSourceAccount[]
   metrics       MetricDaily[]
   reportCaches  ReportCache[]
+  ingestionLogs IngestionProjectLog[]
   alertRules    AlertRule[]
   alertEvents   AlertEvent[]
 }
@@ -141,6 +149,55 @@ model ReportCache {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, reportKey, rangeStart, rangeEnd])
+}
+
+model IngestionSetting {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  enabled      Boolean  @default(false)
+  intervalMins Int      @default(1440)
+  lastRunAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model IngestionRun {
+  id            String          @id @default(cuid())
+  status        IngestionStatus @default(STARTED)
+  startedAt     DateTime        @default(now())
+  finishedAt    DateTime?
+  totalProjects Int             @default(0)
+  totalGa4      Int             @default(0)
+  totalAds      Int             @default(0)
+  error         String?
+  projectLogs   IngestionProjectLog[]
+}
+
+model IngestionProjectLog {
+  id         String   @id @default(cuid())
+  runId      String
+  projectId  String
+  ga4Inserted Int     @default(0)
+  adsInserted Int     @default(0)
+  error      String?
+  startedAt  DateTime @default(now())
+  finishedAt DateTime?
+
+  run     IngestionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model AlertRule {

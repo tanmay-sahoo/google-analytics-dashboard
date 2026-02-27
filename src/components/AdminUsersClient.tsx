@@ -22,7 +22,9 @@ const MENU_OPTIONS: MenuItem[] = [
   { key: "admin-projects", label: "Admin Projects" },
   { key: "admin-users", label: "Admin Users" },
   { key: "admin-integrations", label: "Admin Integrations" },
-  { key: "admin-alerts", label: "Admin Alerts" }
+  { key: "admin-alerts", label: "Admin Alerts" },
+  { key: "admin-settings", label: "Admin Settings" },
+  { key: "admin-logs", label: "Admin Logs" }
 ];
 
 export default function AdminUsersClient({ initialUsers }: { initialUsers?: User[] }) {

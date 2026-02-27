@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchGa4DailyMetrics } from "@/lib/ga4";
 import { fetchAdsDailyMetrics } from "@/lib/google-ads";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const schema = z.object({
   projectId: z.string().min(1)
@@ -122,6 +123,14 @@ export async function POST(request: Request) {
       }
     });
   }
+
+  await logActivity({
+    userId: user.id,
+    action: "SYNC",
+    entityType: "METRICS",
+    entityId: parsed.data.projectId,
+    message: `Synced metrics (${ga4Metrics.length} GA4 days, ${adsMetrics.length} Ads days).`
+  });
 
   return NextResponse.json({ ok: true, ga4Days: ga4Metrics.length, adsDays: adsMetrics.length });
 }

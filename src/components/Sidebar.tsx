@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LayoutGrid, Bell, Users, FolderKanban, Plug } from "lucide-react";
+import { LayoutGrid, Bell, Users, FolderKanban, Plug, Settings, ListChecks } from "lucide-react";
 import SidebarUserMenu from "@/components/SidebarUserMenu";
 import { t } from "@/lib/i18n";
 
@@ -12,7 +12,9 @@ const links = [
   { href: "/alerts", icon: Bell, key: "alerts" },
   { href: "/admin/users", icon: Users, key: "admin-users" },
   { href: "/admin/integrations", icon: Plug, key: "admin-integrations" },
-  { href: "/admin/alerts", icon: Bell, key: "admin-alerts" }
+  { href: "/admin/alerts", icon: Bell, key: "admin-alerts" },
+  { href: "/admin/settings", icon: Settings, key: "admin-settings" },
+  { href: "/admin/logs", icon: ListChecks, key: "admin-logs" }
 ];
 
 export function SidebarContent({
@@ -64,7 +66,11 @@ export function SidebarContent({
               ? "adminUsers"
               : item.key === "admin-integrations"
               ? "adminIntegrations"
-              : "adminAlerts"
+              : item.key === "admin-alerts"
+              ? "adminAlerts"
+              : item.key === "admin-settings"
+              ? "adminSettings"
+              : "adminLogs"
           );
 
           if (item.key === "projects") {

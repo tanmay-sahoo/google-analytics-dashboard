@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -53,6 +54,15 @@ export async function PUT(request: Request, context: { params: { id: string } })
     data: parsed.data
   });
 
+  await logActivity({
+    userId: user.id,
+    action: "UPDATE",
+    entityType: "PROJECT",
+    entityId: project.id,
+    message: `Updated project ${project.name}.`,
+    metadata: parsed.data
+  });
+
   return NextResponse.json({ id: project.id });
 }
 
@@ -62,6 +72,13 @@ export async function DELETE(_: Request, context: { params: { id: string } }) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await prisma.project.delete({ where: { id: context.params.id } });
+  const project = await prisma.project.delete({ where: { id: context.params.id } });
+  await logActivity({
+    userId: user.id,
+    action: "DELETE",
+    entityType: "PROJECT",
+    entityId: project.id,
+    message: `Deleted project ${project.name}.`
+  });
   return NextResponse.json({ ok: true });
 }

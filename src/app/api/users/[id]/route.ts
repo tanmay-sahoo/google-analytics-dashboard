@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -44,6 +45,14 @@ export async function PUT(request: Request, context: { params: { id: string } })
     data
   });
 
+  await logActivity({
+    userId: user.id,
+    action: "UPDATE",
+    entityType: "USER",
+    entityId: context.params.id,
+    message: "Updated user."
+  });
+
   return NextResponse.json({ ok: true });
 }
 
@@ -54,5 +63,12 @@ export async function DELETE(_: Request, context: { params: { id: string } }) {
   }
 
   await prisma.user.delete({ where: { id: context.params.id } });
+  await logActivity({
+    userId: user.id,
+    action: "DELETE",
+    entityType: "USER",
+    entityId: context.params.id,
+    message: "Deleted user."
+  });
   return NextResponse.json({ ok: true });
 }

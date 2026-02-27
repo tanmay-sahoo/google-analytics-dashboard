@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -45,6 +46,14 @@ export async function POST(request: Request) {
 
   const project = await prisma.project.create({
     data: parsed.data
+  });
+
+  await logActivity({
+    userId: user.id,
+    action: "CREATE",
+    entityType: "PROJECT",
+    entityId: project.id,
+    message: `Created project ${project.name}.`
   });
 
   return NextResponse.json({ id: project.id });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 import { listGa4Properties } from "@/lib/ga4-admin";
+import { logActivity } from "@/lib/logging";
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
 const DEFAULT_CURRENCY = "INR";
@@ -69,6 +70,18 @@ export async function POST(request: Request) {
 
     created += 1;
   }
+
+  await logActivity({
+    userId: user.id,
+    action: "IMPORT",
+    entityType: "GA4_PROPERTY",
+    message: `Imported ${created} GA4 properties (${skipped} skipped).`,
+    metadata: {
+      created,
+      skipped,
+      selected: requestedIds?.length ?? null
+    }
+  });
 
   return NextResponse.json({ ok: true, created, skipped });
 }

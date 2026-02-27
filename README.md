@@ -39,10 +39,19 @@ Default admin:
 ## Useful endpoints
 - `POST /api/metrics/sync` `{ projectId }` to generate mock metrics
 - `POST /api/cron/evaluate-alerts` to evaluate rules daily
+- `POST /api/cron/ingest-metrics` to ingest daily GA4/Ads metrics for all projects
 
 ## Notes
-- GA4/Ads OAuth is supported; connect the workspace OAuth in Admin → Integrations and store property/customer IDs per project.
+- GA4/Ads OAuth is supported; connect the workspace OAuth in Admin -> Integrations and store property/customer IDs per project.
 - Slack webhook is stored in rule channels for future integration.
+
+## Cron security
+- Set `CRON_SECRET` in `.env` to secure cron endpoints.
+- When set, call cron endpoints with header `x-cron-secret: <CRON_SECRET>`.
+
+## Logging
+- Admin logs are available at `/admin/logs` with tabs for activity, ingestion runs, and per-project fetches.
+
 ## Google OAuth integration
 - Create a Google Cloud OAuth client (Web app) and set the redirect URI to `GOOGLE_REDIRECT_URI`.
 - Enable the GA4 Data API and Google Ads API in the project.

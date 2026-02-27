@@ -145,11 +145,9 @@ export async function fetchGa4Breakdowns({
   propertyId: string;
   refreshToken: string;
 }) {
-  const [campaigns, sources, devices] = await Promise.all([
-    runBreakdown({ propertyId, refreshToken, dimension: "campaignName", limit: 10 }),
-    runBreakdown({ propertyId, refreshToken, dimension: "sessionSourceMedium", limit: 10 }),
-    runBreakdown({ propertyId, refreshToken, dimension: "deviceCategory", limit: 10 })
-  ]);
+  const campaigns = await runBreakdown({ propertyId, refreshToken, dimension: "campaignName", limit: 10 });
+  const sources = await runBreakdown({ propertyId, refreshToken, dimension: "sessionSourceMedium", limit: 10 });
+  const devices = await runBreakdown({ propertyId, refreshToken, dimension: "deviceCategory", limit: 10 });
 
   return { campaigns, sources, devices };
 }
@@ -280,62 +278,60 @@ export async function fetchGa4Highlights({
   startDate: string;
   endDate: string;
 }) {
-  const [events, sources, landingPages, userAcquisition, sessionAcquisition, countries] = await Promise.all([
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "eventName",
-      metric: "eventCount",
-      limit: 8,
-      startDate,
-      endDate
-    }),
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "sessionSourceMedium",
-      metric: "sessions",
-      limit: 8,
-      startDate,
-      endDate
-    }),
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "landingPagePlusQueryString",
-      metric: "screenPageViews",
-      limit: 8,
-      startDate,
-      endDate
-    }),
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "firstUserDefaultChannelGroup",
-      metric: "newUsers",
-      limit: 8,
-      startDate,
-      endDate
-    }),
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "sessionDefaultChannelGroup",
-      metric: "sessions",
-      limit: 8,
-      startDate,
-      endDate
-    }),
-    runTopReport({
-      propertyId,
-      refreshToken,
-      dimension: "country",
-      metric: "activeUsers",
-      limit: 8,
-      startDate,
-      endDate
-    })
-  ]);
+  const events = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "eventName",
+    metric: "eventCount",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const sources = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "sessionSourceMedium",
+    metric: "sessions",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const landingPages = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "landingPagePlusQueryString",
+    metric: "screenPageViews",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const userAcquisition = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "firstUserDefaultChannelGroup",
+    metric: "newUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const sessionAcquisition = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "sessionDefaultChannelGroup",
+    metric: "sessions",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const countries = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "country",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
 
   return { events, sources, landingPages, userAcquisition, sessionAcquisition, countries };
 }
@@ -351,154 +347,136 @@ export async function fetchGa4ProjectReports({
   startDate: string;
   endDate: string;
 }) {
-  const [
-    summary,
-    engagement,
-    acquisitionUsers,
-    acquisitionSessions,
-    topPages,
-    topEvents,
-    retentionSeries,
-    platform,
-    operatingSystem,
-    browser,
-    deviceCategory,
-    platformDevice,
-    leastPages,
-    searchTerms
-  ] =
-    await Promise.all([
-      runSummaryReport({
-        propertyId,
-        refreshToken,
-        metrics: [
-          "activeUsers",
-          "newUsers",
-          "totalUsers",
-          "sessions",
-          "eventCount",
-          "totalRevenue",
-          "conversions"
-        ],
-        startDate,
-        endDate
-      }),
-      runSummaryReport({
-        propertyId,
-        refreshToken,
-        metrics: ["engagementRate", "bounceRate", "averageSessionDuration", "sessionsPerUser", "screenPageViews"],
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "firstUserSourceMedium",
-        metric: "newUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "sessionSourceMedium",
-        metric: "sessions",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "pagePath",
-        metric: "screenPageViews",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "eventName",
-        metric: "eventCount",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runSeriesReport({
-        propertyId,
-        refreshToken,
-        metrics: ["newUsers", "totalUsers"],
-        dimension: "date",
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "platform",
-        metric: "activeUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "operatingSystem",
-        metric: "activeUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "browser",
-        metric: "activeUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "deviceCategory",
-        metric: "activeUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "platformDeviceCategory",
-        metric: "activeUsers",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "pagePath",
-        metric: "screenPageViews",
-        limit: 8,
-        startDate,
-        endDate,
-        order: "asc"
-      }),
-      runTopReport({
-        propertyId,
-        refreshToken,
-        dimension: "searchTerm",
-        metric: "sessions",
-        limit: 8,
-        startDate,
-        endDate
-      }),
-    ]);
+  const summary = await runSummaryReport({
+    propertyId,
+    refreshToken,
+    metrics: [
+      "activeUsers",
+      "newUsers",
+      "totalUsers",
+      "sessions",
+      "eventCount",
+      "totalRevenue",
+      "conversions"
+    ],
+    startDate,
+    endDate
+  });
+  const engagement = await runSummaryReport({
+    propertyId,
+    refreshToken,
+    metrics: ["engagementRate", "bounceRate", "averageSessionDuration", "sessionsPerUser", "screenPageViews"],
+    startDate,
+    endDate
+  });
+  const acquisitionUsers = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "firstUserSourceMedium",
+    metric: "newUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const acquisitionSessions = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "sessionSourceMedium",
+    metric: "sessions",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const topPages = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "pagePath",
+    metric: "screenPageViews",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const topEvents = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "eventName",
+    metric: "eventCount",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const retentionSeries = await runSeriesReport({
+    propertyId,
+    refreshToken,
+    metrics: ["newUsers", "totalUsers"],
+    dimension: "date",
+    startDate,
+    endDate
+  });
+  const platform = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "platform",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const operatingSystem = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "operatingSystem",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const browser = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "browser",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const deviceCategory = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "deviceCategory",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const platformDevice = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "platformDeviceCategory",
+    metric: "activeUsers",
+    limit: 8,
+    startDate,
+    endDate
+  });
+  const leastPages = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "pagePath",
+    metric: "screenPageViews",
+    limit: 8,
+    startDate,
+    endDate,
+    order: "asc"
+  });
+  const searchTerms = await runTopReport({
+    propertyId,
+    refreshToken,
+    dimension: "searchTerm",
+    metric: "sessions",
+    limit: 8,
+    startDate,
+    endDate
+  });
 
   return {
     summary: {
@@ -614,11 +592,50 @@ export async function fetchGa4EcommerceReport({
     }
   }
 
+  async function runItemEventCount(eventName: string) {
+    try {
+      const response = await analyticsData.properties.runReport({
+        property: `properties/${propertyId}`,
+        requestBody: {
+          dateRanges: [{ startDate, endDate }],
+          metrics: [{ name: "eventCount" }],
+          dimensions: [{ name: "itemName" }],
+          dimensionFilter: {
+            filter: {
+              fieldName: "eventName",
+              stringFilter: {
+                matchType: "EXACT",
+                value: eventName
+              }
+            }
+          },
+          orderBys: [{ desc: true, metric: { metricName: "eventCount" } }],
+          limit
+        }
+      });
+      const rows = response.data.rows ?? [];
+      const values = new Map<string, number>();
+      rows.forEach((row) => {
+        const label = row.dimensionValues?.[0]?.value ?? "-";
+        const value = Number(row.metricValues?.[0]?.value ?? 0);
+        values.set(label, value);
+      });
+      return values;
+    } catch (error) {
+      return null;
+    }
+  }
+
   try {
-    const itemViews =
+    let itemViews =
+      (await runItemMetric("itemsViewed")) ??
       (await runItemMetric("itemViews")) ??
+      (await runItemMetric("viewItemEventCount")) ??
       (await runItemMetric("itemViewEvents")) ??
       new Map<string, number>();
+    if (itemViews.size === 0) {
+      itemViews = (await runItemEventCount("view_item")) ?? itemViews;
+    }
     const itemsAddedToCart = (await runItemMetric("itemsAddedToCart")) ?? new Map<string, number>();
     const itemsPurchased = (await runItemMetric("itemsPurchased")) ?? new Map<string, number>();
     const itemRevenue = (await runItemMetric("itemRevenue")) ?? new Map<string, number>();

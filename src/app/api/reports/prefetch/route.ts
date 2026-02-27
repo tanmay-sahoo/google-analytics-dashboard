@@ -142,11 +142,14 @@ export async function POST(request: Request) {
     });
   });
 
-  const results = await Promise.allSettled(tasks.map((task) => task.run()));
-  const failed = results
-    .map((result, index) => ({ result, key: tasks[index]?.key }))
-    .filter((entry) => entry.result.status === "rejected")
-    .map((entry) => entry.key);
+  const failed: string[] = [];
+  for (const task of tasks) {
+    try {
+      await task.run();
+    } catch {
+      failed.push(task.key);
+    }
+  }
 
   return NextResponse.json({
     ok: true,

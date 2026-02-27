@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const createSchema = z.object({
   name: z.string().min(2).optional(),
@@ -64,6 +65,14 @@ export async function POST(request: Request) {
       menuAccess: parsed.data.menuAccess ?? null,
       createdById: user.id
     }
+  });
+
+  await logActivity({
+    userId: user.id,
+    action: "CREATE",
+    entityType: "USER",
+    entityId: created.id,
+    message: `Created user ${created.email}.`
   });
 
   return NextResponse.json({ id: created.id });
