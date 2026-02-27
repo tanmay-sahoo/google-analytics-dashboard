@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .app-shell {
+  background-color: #0e1116;
+  background-image: none;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .app-shell main {
+  background-color: #0e1116;
+}
+
+[data-theme="dark"] .app-shell a {
+  @apply text-white/80;
+}
+
+[data-theme="dark"] .app-shell a:hover {
+  @apply text-white;
+}
+
+[data-theme="dark"] .app-shell .text-slate {
+  @apply text-white;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/70 {
+  @apply text-white/70;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/60 {
+  @apply text-white/60;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/80 {
+  @apply text-white/80;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/50 {
+  @apply text-white/50;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/40 {
+  @apply text-white/40;
+}
+
+[data-theme="dark"] .app-shell .text-slate\/30 {
+  @apply text-white/30;
+}
+
+[data-theme="dark"] .app-shell .border-slate\/20 {
+  @apply border-white/10;
+}
+
+[data-theme="dark"] .app-shell .border-slate\/10 {
+  @apply border-white/10;
+}
+
+[data-theme="dark"] .app-shell .bg-white\/80,
+[data-theme="dark"] .app-shell .bg-white\/90,
+[data-theme="dark"] .app-shell .bg-white\/70,
+[data-theme="dark"] .app-shell .bg-white {
+  @apply bg-[#141a26];
+}
+
+[data-theme="dark"] .app-shell .bg-ash {
+  @apply bg-[#0e1116];
+}
+
+[data-theme="dark"] header {
+  @apply bg-[#131824] border-white/10;
+}
+
+[data-theme="dark"] aside {
+  @apply bg-[#111621] border-white/10;
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .surface {
+  @apply bg-[#171d2a] text-ash ring-1 ring-white/10;
+}
+
+[data-theme="dark"] .btn-outline {
+  @apply border-white/15 text-ash hover:border-white/30 hover:bg-white/5;
+}
+
+[data-theme="dark"] .btn-primary {
+  @apply bg-[#2b64f2] text-white hover:bg-[#2355d6];
+}
+
+[data-theme="dark"] .input {
+  @apply border-white/10 bg-[#0e121a] text-ash placeholder:text-white/40 focus:border-ocean;
+}
+
+[data-theme="dark"] .table th {
+  @apply text-white/40;
+}
+
+[data-theme="dark"] .table td {
+  @apply text-white/80;
+}
+
+[data-theme="dark"] .muted {
+  @apply text-white/50;
+}
+
+[data-theme="dark"] .section-header {
+  @apply border-white/10 bg-[#171d2a];
+}
+
+[data-theme="dark"] .chip {
+  @apply border-white/15 bg-[#0f1420] text-white/80;
+}
+
+[data-theme="dark"] .label {
+  @apply text-white/50;
+}
+
+body {
+  @apply bg-ash text-slate;
+  font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+}
+
+.surface {
+  @apply bg-white/90 shadow-sm ring-1 ring-slate/20;
+}
+
+.card {
+  @apply surface rounded-2xl p-5;
+}
+
+.kpi {
+  @apply text-2xl font-semibold text-slate;
+}
+
+.label {
+  @apply text-xs uppercase tracking-[0.2em] text-slate/60;
+}
+
+.page-title {
+  @apply text-3xl font-semibold tracking-tight;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition;
+}
+
+.btn-primary {
+  @apply btn bg-slate text-white shadow-sm hover:bg-slate/90;
+}
+
+.btn-outline {
+  @apply btn border border-slate/20 text-slate hover:border-slate/40 hover:bg-slate/5;
+}
+
+.input {
+  @apply w-full rounded-xl border border-slate/20 bg-white px-4 py-2 text-sm outline-none focus:border-ocean focus:ring-2 focus:ring-ocean/20;
+}
+
+.table {
+  @apply w-full text-sm;
+}
+
+.table th {
+  @apply text-left text-xs uppercase tracking-[0.2em] text-slate/50;
+}
+
+.table td {
+  @apply py-3;
+}
+
+.section-header {
+  @apply flex flex-col gap-2 rounded-2xl border border-slate/10 bg-white/70 px-6 py-5 md:flex-row md:items-center md:justify-between;
+}
+
+.muted {
+  @apply text-sm text-slate/60;
+}
+
+.chip {
+  @apply inline-flex items-center gap-2 rounded-full border border-slate/10 bg-white px-3 py-1 text-xs text-slate/70;
+}
+
+.alert {
+  @apply rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800;
+}
+
+/* Dark theme overrides (placed last to win cascade). */
+[data-theme="dark"] body {
+  @apply bg-[#0e1116] text-ash;
+}
+
+[data-theme="dark"] header {
+  @apply bg-[#131824] border-white/10;
+}
+
+[data-theme="dark"] aside {
+  @apply bg-[#111621] border-white/10;
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .surface {
+  @apply bg-[#171d2a] text-ash ring-1 ring-white/10;
+}
+
+[data-theme="dark"] .btn-outline {
+  @apply border-white/15 text-ash hover:border-white/30 hover:bg-white/5;
+}
+
+[data-theme="dark"] .btn-primary {
+  @apply bg-[#2b64f2] text-white hover:bg-[#2355d6];
+}
+
+[data-theme="dark"] .input {
+  @apply border-white/10 bg-[#0e121a] text-ash placeholder:text-white/40 focus:border-ocean;
+}
+
+[data-theme="dark"] .table th {
+  @apply text-white/40;
+}
+
+[data-theme="dark"] .table td {
+  @apply text-white/80;
+}
+
+[data-theme="dark"] .muted {
+  @apply text-white/50;
+}
+
+[data-theme="dark"] .section-header {
+  @apply border-white/10 bg-[#171d2a];
+}
+
+[data-theme="dark"] .chip {
+  @apply border-white/15 bg-[#0f1420] text-white/80;
+}
+
+[data-theme="dark"] .label {
+  @apply text-white/50;
+}

@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum DataSourceType {
+  GA4
+  ADS
+}
+
+enum MetricSource {
+  GA4
+  ADS
+}
+
+enum AlertCondition {
+  GT
+  LT
+  PCT_CHANGE
+}
+
+enum AlertScope {
+  PROJECT
+  CAMPAIGN
+}
+
+enum AlertWindow {
+  TODAY
+  YESTERDAY
+  LAST_7_DAYS
+}
+
+enum AlertFrequency {
+  DAILY_9AM
+}
+
+enum AlertStatus {
+  TRIGGERED
+  DELIVERED
+  MUTED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String?
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(USER)
+  isActive     Boolean      @default(true)
+  menuAccess   Json?
+  locale       String       @default("en")
+  theme        String       @default("light")
+  createdById  String?
+  createdAt    DateTime     @default(now())
+  projectUsers ProjectUser[]
+  createdRules AlertRule[]  @relation("CreatedRules")
+
+  createdBy    User?        @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers User[]       @relation("UserCreator")
+}
+
+model Project {
+  id            String             @id @default(cuid())
+  name          String
+  timezone      String
+  currency      String
+  createdAt     DateTime           @default(now())
+  projectUsers  ProjectUser[]
+  dataSources   DataSourceAccount[]
+  metrics       MetricDaily[]
+  alertRules    AlertRule[]
+  alertEvents   AlertEvent[]
+}
+
+model ProjectUser {
+  id        String  @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model DataSourceAccount {
+  id             String         @id @default(cuid())
+  projectId      String
+  type           DataSourceType
+  externalId     String
+  createdAt      DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, type])
+}
+
+model IntegrationSetting {
+  id             String         @id @default(cuid())
+  type           DataSourceType @unique
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  connectedEmail String?
+  createdAt      DateTime       @default(now())
+}
+
+model MetricDaily {
+  id        String       @id @default(cuid())
+  projectId String
+  date      DateTime
+  source    MetricSource
+  metrics   Json
+  createdAt DateTime     @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date, source])
+}
+
+model AlertRule {
+  id               String          @id @default(cuid())
+  projectId        String
+  createdByUserId  String
+  metric           String
+  scope            AlertScope
+  filter           Json?
+  condition        AlertCondition
+  threshold        Float
+  window           AlertWindow
+  frequency        AlertFrequency
+  channels         Json
+  cooldownMins     Int
+  enabled          Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("CreatedRules", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  events   AlertEvent[]
+}
+
+model AlertEvent {
+  id          String      @id @default(cuid())
+  ruleId      String
+  projectId   String
+  evaluatedAt DateTime
+  value       Float
+  message     String
+  status      AlertStatus
+  deliveredAt DateTime?
+
+  rule    AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
