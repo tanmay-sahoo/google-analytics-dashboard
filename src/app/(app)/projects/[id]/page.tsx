@@ -57,8 +57,17 @@ export default async function ProjectDetailPage({
 
   const ga4Source = project.dataSources.find((item) => item.type === "GA4");
   const adsSource = project.dataSources.find((item) => item.type === "ADS");
+  const merchantSource = project.dataSources.find((item) => item.type === "MERCHANT");
   const ga4Id = ga4Source?.externalId;
   const adsId = adsSource?.externalId;
+  const merchantId = merchantSource?.externalId;
+  const assignedMerchants = await prisma.dataSourceAccount.findMany({
+    where: { type: "MERCHANT", projectId: { not: project.id } },
+    select: { externalId: true }
+  });
+  const assignedMerchantIds = Array.from(
+    new Set(assignedMerchants.map((item) => item.externalId).filter(Boolean))
+  );
 
   const ga4Integration = await prisma.integrationSetting.findUnique({ where: { type: "GA4" } });
   let campaigns: Array<[string, string, string]> = [];
@@ -131,6 +140,8 @@ export default async function ProjectDetailPage({
         projectId={project.id}
         ga4Id={ga4Id}
         adsId={adsId}
+        merchantId={merchantId}
+        assignedMerchantIds={assignedMerchantIds}
         projectName={project.name}
         role={user.role}
       />

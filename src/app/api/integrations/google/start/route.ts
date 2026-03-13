@@ -10,9 +10,9 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type") as "GA4" | "ADS" | null;
+  const type = searchParams.get("type") as "GA4" | "ADS" | "MERCHANT" | null;
 
-  if (type !== "GA4" && type !== "ADS") {
+  if (type !== "GA4" && type !== "ADS" && type !== "MERCHANT") {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 

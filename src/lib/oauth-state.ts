@@ -3,7 +3,7 @@ import crypto from "crypto";
 const STATE_SECRET = process.env.NEXTAUTH_SECRET ?? "state-secret";
 
 export type OAuthState = {
-  type: "GA4" | "ADS";
+  type: "GA4" | "ADS" | "MERCHANT";
   nonce: string;
   issuedAt: number;
 };

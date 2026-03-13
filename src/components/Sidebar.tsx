@@ -101,6 +101,13 @@ export function SidebarContent({
                     >
                       {t(locale, "reports")}
                     </Link>
+                    <Link
+                      href="/merchant"
+                      onClick={onNavigate}
+                      className="ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs text-slate/50 transition hover:bg-slate/5 hover:text-slate/70"
+                    >
+                      {t(locale, "merchant")}
+                    </Link>
                   </>
                 ) : null}
               </div>

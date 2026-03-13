@@ -2,9 +2,10 @@
 import AdminIntegrationsClient from "@/components/AdminIntegrationsClient";
 
 export default async function AdminIntegrationsPage() {
-  const [ga4, ads] = await Promise.all([
+  const [ga4, ads, merchant] = await Promise.all([
     prisma.integrationSetting.findUnique({ where: { type: "GA4" } }),
-    prisma.integrationSetting.findUnique({ where: { type: "ADS" } })
+    prisma.integrationSetting.findUnique({ where: { type: "ADS" } }),
+    prisma.integrationSetting.findUnique({ where: { type: "MERCHANT" } })
   ]);
 
   return (
@@ -17,6 +18,7 @@ export default async function AdminIntegrationsPage() {
       <AdminIntegrationsClient
         ga4={{ connected: Boolean(ga4?.refreshToken), email: ga4?.connectedEmail }}
         ads={{ connected: Boolean(ads?.refreshToken), email: ads?.connectedEmail }}
+        merchant={{ connected: Boolean(merchant?.refreshToken), email: merchant?.connectedEmail }}
       />
     </div>
   );

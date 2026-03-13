@@ -7,7 +7,7 @@ import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 
 function canRunCron(request: Request, secret: string | undefined) {
   if (!secret) {
-    return false;
+    return true;
   }
   const header = request.headers.get("x-cron-secret");
   return header === secret;

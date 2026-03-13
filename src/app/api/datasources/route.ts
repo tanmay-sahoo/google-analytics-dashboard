@@ -5,7 +5,7 @@ import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 
 const schema = z.object({
   projectId: z.string().min(1),
-  type: z.enum(["GA4", "ADS"]),
+  type: z.enum(["GA4", "ADS", "MERCHANT"]),
   externalId: z.string().min(2)
 });
 

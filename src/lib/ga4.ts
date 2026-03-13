@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { getOAuthClient } from "@/lib/google-oauth";
 import { addDays, formatDateShort } from "@/lib/time";
+import { createLimiter, withRetry } from "@/lib/request-limiter";
 
 export type Ga4DailyMetrics = {
   date: Date;
@@ -22,6 +23,32 @@ export type Ga4TopItem = {
   label: string;
   value: number;
 };
+
+const ga4Limiter = createLimiter(1);
+
+async function runGa4Report({
+  propertyId,
+  refreshToken,
+  requestBody
+}: {
+  propertyId: string;
+  refreshToken: string;
+  requestBody: Record<string, unknown>;
+}) {
+  const authClient = getOAuthClient();
+  authClient.setCredentials({ refresh_token: refreshToken });
+  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
+  return ga4Limiter(() =>
+    withRetry(
+      () =>
+        analyticsData.properties.runReport({
+          property: `properties/${propertyId}`,
+          requestBody
+        }),
+      { label: "ga4" }
+    )
+  );
+}
 
 export async function fetchGa4DailyMetrics({
   propertyId,
@@ -52,13 +79,9 @@ export async function fetchGa4DailyMetricsRange({
   startDate: string;
   endDate: string;
 }): Promise<Ga4DailyMetrics[]> {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
-  const response = await analyticsData.properties.runReport({
-    property: `properties/${propertyId}`,
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
     requestBody: {
       dateRanges: [{ startDate, endDate }],
       metrics: [
@@ -101,15 +124,12 @@ async function runBreakdown({
   dimension: string;
   limit: number;
 }): Promise<Ga4BreakdownRow[]> {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
   const end = new Date();
   const start = addDays(end, -29);
 
-  const response = await analyticsData.properties.runReport({
-    property: `properties/${propertyId}`,
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
     requestBody: {
       dateRanges: [{ startDate: formatDateShort(start), endDate: formatDateShort(end) }],
       metrics: [
@@ -171,12 +191,9 @@ async function runTopReport({
   endDate: string;
   order?: "asc" | "desc";
 }): Promise<Ga4TopItem[]> {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
-  const response = await analyticsData.properties.runReport({
-    property: `properties/${propertyId}`,
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
     requestBody: {
       dateRanges: [{ startDate, endDate }],
       metrics: [{ name: metric }],
@@ -208,12 +225,9 @@ async function runSummaryReport({
   endDate: string;
   dimensions?: string[];
 }): Promise<{ dimensions: string[]; metrics: number[] }> {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
-  const response = await analyticsData.properties.runReport({
-    property: `properties/${propertyId}`,
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
     requestBody: {
       dateRanges: [{ startDate, endDate }],
       metrics: metrics.map((name) => ({ name })),
@@ -245,12 +259,9 @@ async function runSeriesReport({
   startDate: string;
   endDate: string;
 }): Promise<{ dates: string[]; series: number[][] }> {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
-  const response = await analyticsData.properties.runReport({
-    property: `properties/${propertyId}`,
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
     requestBody: {
       dateRanges: [{ startDate, endDate }],
       metrics: metrics.map((name) => ({ name })),
@@ -563,14 +574,11 @@ export async function fetchGa4EcommerceReport({
   endDate: string;
   limit?: number;
 }) {
-  const authClient = getOAuthClient();
-  authClient.setCredentials({ refresh_token: refreshToken });
-  const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
   async function runItemMetric(metricName: string) {
     try {
-      const response = await analyticsData.properties.runReport({
-        property: `properties/${propertyId}`,
+      const response = await runGa4Report({
+        propertyId,
+        refreshToken,
         requestBody: {
           dateRanges: [{ startDate, endDate }],
           metrics: [{ name: metricName }],
@@ -594,8 +602,9 @@ export async function fetchGa4EcommerceReport({
 
   async function runItemEventCount(eventName: string) {
     try {
-      const response = await analyticsData.properties.runReport({
-        property: `properties/${propertyId}`,
+      const response = await runGa4Report({
+        propertyId,
+        refreshToken,
         requestBody: {
           dateRanges: [{ startDate, endDate }],
           metrics: [{ name: "eventCount" }],
@@ -693,16 +702,21 @@ export async function fetchGa4Realtime({
   const authClient = getOAuthClient();
   authClient.setCredentials({ refresh_token: refreshToken });
   const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
-
-  const response = await analyticsData.properties.runRealtimeReport({
-    property: `properties/${propertyId}`,
-    requestBody: {
-      metrics: [{ name: "activeUsers" }],
-      dimensions: [{ name: "country" }],
-      orderBys: [{ desc: true, metric: { metricName: "activeUsers" } }],
-      limit: 8
-    }
-  });
+  const response = await ga4Limiter(() =>
+    withRetry(
+      () =>
+        analyticsData.properties.runRealtimeReport({
+          property: `properties/${propertyId}`,
+          requestBody: {
+            metrics: [{ name: "activeUsers" }],
+            dimensions: [{ name: "country" }],
+            orderBys: [{ desc: true, metric: { metricName: "activeUsers" } }],
+            limit: 8
+          }
+        }),
+      { label: "ga4" }
+    )
+  );
 
   const rows = response.data.rows ?? [];
   const countries = rows.map((row) => ({

@@ -3,6 +3,7 @@ import { randomNonce, signState } from "@/lib/oauth-state";
 
 const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
+const MERCHANT_SCOPE = "https://www.googleapis.com/auth/content";
 
 export function getOAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID ?? "";
@@ -11,11 +12,13 @@ export function getOAuthClient() {
   return new OAuth2Client({ clientId, clientSecret, redirectUri });
 }
 
-export function getScopes(type: "GA4" | "ADS") {
-  return type === "GA4" ? [GA4_SCOPE] : [ADS_SCOPE];
+export function getScopes(type: "GA4" | "ADS" | "MERCHANT") {
+  if (type === "GA4") return [GA4_SCOPE];
+  if (type === "ADS") return [ADS_SCOPE];
+  return [MERCHANT_SCOPE];
 }
 
-export function buildAuthUrl(type: "GA4" | "ADS") {
+export function buildAuthUrl(type: "GA4" | "ADS" | "MERCHANT") {
   const client = getOAuthClient();
   const state = signState({
     type,

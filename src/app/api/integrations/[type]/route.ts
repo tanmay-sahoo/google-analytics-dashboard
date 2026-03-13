@@ -9,7 +9,7 @@ export async function POST(_: Request, context: { params: { type: string } }) {
   }
 
   const type = context.params.type;
-  if (type !== "GA4" && type !== "ADS") {
+  if (type !== "GA4" && type !== "ADS" && type !== "MERCHANT") {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 

@@ -15,6 +15,7 @@ enum Role {
 enum DataSourceType {
   GA4
   ADS
+  MERCHANT
 }
 
 enum MetricSource {
@@ -86,6 +87,7 @@ model Project {
   metrics       MetricDaily[]
   reportCaches  ReportCache[]
   ingestionLogs IngestionProjectLog[]
+  merchantProducts MerchantProduct[]
   alertRules    AlertRule[]
   alertEvents   AlertEvent[]
 }
@@ -198,6 +200,48 @@ model IngestionProjectLog {
 
   run     IngestionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model MerchantProduct {
+  id            String   @id @default(cuid())
+  projectId     String
+  merchantId    String
+  offerId       String
+  title         String
+  link          String?
+  imageLink     String?
+  availability  String?
+  priceValue    Float?
+  priceCurrency String?
+  clicks        Int      @default(0)
+  impressions   Int      @default(0)
+  sales         Int      @default(0)
+  revenue       Float    @default(0)
+  performanceAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, merchantId, offerId])
+}
+
+model MerchantAccountImport {
+  id         String   @id @default(cuid())
+  merchantId String   @unique
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AiConfig {
+  id        String   @id @default(cuid())
+  provider  String
+  model     String
+  apiKey    String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model AlertRule {

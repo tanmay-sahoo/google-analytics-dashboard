@@ -59,6 +59,10 @@ Default admin:
 ## Logging
 - Admin logs are available at `/admin/logs` with tabs for activity, ingestion runs, and per-project fetches.
 
+## AI suggestions
+- Optional product optimization suggestions in Merchant Products.
+- Set one or more of: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`.
+
 ## Google OAuth integration
 - Create a Google Cloud OAuth client (Web app) and set the redirect URI to `GOOGLE_REDIRECT_URI`.
 - Enable the GA4 Data API and Google Ads API in the project.

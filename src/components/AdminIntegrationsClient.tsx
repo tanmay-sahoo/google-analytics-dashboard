@@ -13,14 +13,18 @@ type IntegrationStatus = {
 
 export default function AdminIntegrationsClient({
   ga4,
-  ads
+  ads,
+  merchant
 }: {
   ga4: IntegrationStatus;
   ads: IntegrationStatus;
+  merchant: IntegrationStatus;
 }) {
   const [ga4Properties, setGa4Properties] = useState<Ga4Property[]>([]);
   const [adsCustomers, setAdsCustomers] = useState<AdsCustomer[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [merchantAccounts, setMerchantAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [selectedMerchant, setSelectedMerchant] = useState<Set<string>>(new Set());
   const [selectedGa4, setSelectedGa4] = useState<Set<string>>(new Set());
 
   async function loadGa4() {
@@ -81,6 +85,48 @@ export default function AdminIntegrationsClient({
     const data = await response.json();
     setAdsCustomers(data.customers ?? []);
   }
+
+  async function loadMerchant() {
+    setMessage(null);
+    const response = await fetch("/api/integrations/merchant/accounts");
+    if (!response.ok) {
+      let errorMessage = "Failed to load Merchant accounts";
+      try {
+        const data = await response.json();
+        errorMessage = data.error ?? errorMessage;
+      } catch {
+        // Keep default message if response isn't JSON.
+      }
+      setMessage(errorMessage);
+      return;
+    }
+    const data = await response.json();
+    setMerchantAccounts(data.accounts ?? []);
+    setSelectedMerchant(new Set());
+  }
+
+  async function importMerchantAccounts() {
+    if (selectedMerchant.size === 0) {
+      setMessage("Select at least one Merchant account to import.");
+      return;
+    }
+    const payload = merchantAccounts.filter((account) => selectedMerchant.has(account.id));
+    const response = await fetch("/api/integrations/merchant/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accounts: payload })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.error ?? "Failed to import Merchant accounts.");
+      return;
+    }
+    const data = await response.json();
+    setMessage(`Imported ${data.imported} Merchant accounts.`);
+  }
+
+  const allMerchantsSelected =
+    merchantAccounts.length > 0 && selectedMerchant.size === merchantAccounts.length;
 
   return (
     <div className="space-y-6">
@@ -146,8 +192,76 @@ export default function AdminIntegrationsClient({
                   <div>
                     <div className="font-semibold text-slate">{prop.displayName}</div>
                     <div className="text-xs text-slate/60">
-                      Account: {prop.accountName ?? prop.accountId ?? "-"} . Property ID: {prop.id}
+                      Account: {prop.accountName ?? prop.accountId ?? "-"} - Property ID: {prop.id}
                     </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="card space-y-3">
+          <div className="label">Merchant Center Account</div>
+          <div className="text-sm text-slate/70">
+            {merchant.connected ? `Connected ${merchant.email ?? ""}` : "Not connected"}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a className="btn-primary" href="/api/integrations/google/start?type=MERCHANT">
+              {merchant.connected ? "Reconnect" : "Connect"}
+            </a>
+            {merchant.connected ? (
+              <form action="/api/integrations/MERCHANT" method="post">
+                <button className="btn-outline" type="submit">
+                  Disconnect
+                </button>
+              </form>
+            ) : null}
+            <button className="btn-outline" type="button" onClick={loadMerchant}>
+              Fetch accounts
+            </button>
+            {selectedMerchant.size > 0 ? (
+              <button className="btn-outline" type="button" onClick={importMerchantAccounts}>
+                Import selected
+              </button>
+            ) : null}
+          </div>
+          {merchantAccounts.length ? (
+            <div className="mt-3 space-y-2 text-sm">
+              <label className="flex items-center gap-2 text-xs text-slate/60">
+                <input
+                  type="checkbox"
+                  checked={allMerchantsSelected}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      setSelectedMerchant(new Set(merchantAccounts.map((account) => account.id)));
+                    } else {
+                      setSelectedMerchant(new Set());
+                    }
+                  }}
+                />
+                Select all
+              </label>
+              {merchantAccounts.map((account) => (
+                <label
+                  key={account.id}
+                  className="flex items-start gap-3 rounded-xl border border-slate/10 bg-white px-3 py-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedMerchant.has(account.id)}
+                    onChange={(event) => {
+                      const next = new Set(selectedMerchant);
+                      if (event.target.checked) {
+                        next.add(account.id);
+                      } else {
+                        next.delete(account.id);
+                      }
+                      setSelectedMerchant(next);
+                    }}
+                  />
+                  <div>
+                    <div className="font-semibold text-slate">{account.name}</div>
+                    <div className="text-xs text-slate/60">Merchant ID: {account.id}</div>
                   </div>
                 </label>
               ))}

@@ -6,12 +6,16 @@ export default function ProjectDetailClient({
   projectId,
   ga4Id,
   adsId,
+  merchantId,
+  assignedMerchantIds,
   projectName,
   role
 }: {
   projectId: string;
   ga4Id?: string | null;
   adsId?: string | null;
+  merchantId?: string | null;
+  assignedMerchantIds: string[];
   projectName: string;
   role?: string;
 }) {
@@ -21,12 +25,16 @@ export default function ProjectDetailClient({
     { id: string; displayName: string; accountName?: string }[]
   >([]);
   const [ga4Loading, setGa4Loading] = useState(false);
+  const [merchantAccounts, setMerchantAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [merchantLoading, setMerchantLoading] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const cacheKey = "mdh_ga4_properties_cache";
   const cacheTimeKey = "mdh_ga4_properties_cache_time";
+  const merchantCacheKey = "mdh_merchant_accounts_cache";
+  const merchantCacheTimeKey = "mdh_merchant_accounts_cache_time";
   const cacheTtlMs = 6 * 60 * 60 * 1000;
 
   useEffect(() => {
@@ -46,8 +54,22 @@ export default function ProjectDetailClient({
       void loadGa4Properties();
     }
   }, []);
+  useEffect(() => {
+    const cached = localStorage.getItem(merchantCacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as typeof merchantAccounts;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMerchantAccounts(parsed);
+        }
+      } catch {
+        // Ignore bad cache.
+      }
+    }
+    void loadMerchantAccounts();
+  }, []);
 
-  async function saveSource(type: "GA4" | "ADS", externalId: string) {
+  async function saveSource(type: "GA4" | "ADS" | "MERCHANT", externalId: string) {
     if (!externalId || externalId.trim().length < 2) {
       return;
     }
@@ -100,6 +122,23 @@ export default function ProjectDetailClient({
     setGa4Loading(false);
   }
 
+  async function loadMerchantAccounts() {
+    setMerchantLoading(true);
+    setMessage(null);
+    const response = await fetch("/api/integrations/merchant/imported");
+    if (response.ok) {
+      const data = await response.json();
+      const list = data.accounts ?? [];
+      setMerchantAccounts(list);
+      localStorage.setItem(merchantCacheKey, JSON.stringify(list));
+      localStorage.setItem(merchantCacheTimeKey, String(Date.now()));
+    } else {
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.error ?? "Failed to load Merchant accounts.");
+    }
+    setMerchantLoading(false);
+  }
+
   async function deleteProject() {
     setDeleteError(null);
     if (confirmName.trim() !== projectName) {
@@ -122,7 +161,7 @@ export default function ProjectDetailClient({
       <div className="flex items-center justify-between">
         <div>
           <div className="label">Data sources</div>
-          <p className="text-sm text-slate/60">Store GA4 property and Ads customer IDs.</p>
+          <p className="text-sm text-slate/60">Store GA4 property, Ads customer, and Merchant IDs.</p>
         </div>
         <button className="btn-outline" onClick={syncNow} disabled={loading}>
           {loading ? "Syncing..." : "Sync now"}
@@ -141,7 +180,7 @@ export default function ProjectDetailClient({
               {ga4Properties.map((prop) => (
                 <option key={prop.id} value={prop.id}>
                   {prop.displayName}
-                  {prop.accountName ? ` · ${prop.accountName}` : ""}
+                  {prop.accountName ? ` - ${prop.accountName}` : ""}
                 </option>
               ))}
             </select>
@@ -165,9 +204,40 @@ export default function ProjectDetailClient({
             placeholder="e.g. 123-456-7890"
           />
         </label>
+        <label className="space-y-2 text-sm">
+          <div className="text-slate/70">Merchant Center Account ID</div>
+          <div className="flex flex-col gap-2">
+            <select
+              className="input"
+              value={merchantId ?? ""}
+              onChange={(event) => saveSource("MERCHANT", event.target.value)}
+            >
+              <option value="">Select Merchant account</option>
+              {merchantAccounts.map((account) => (
+                <option
+                  key={account.id}
+                  value={account.id}
+                  disabled={assignedMerchantIds.includes(account.id) && account.id !== merchantId}
+                >
+                  {account.name} - {account.id}
+                  {assignedMerchantIds.includes(account.id) && account.id !== merchantId ? " (in use)" : ""}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input"
+              defaultValue={merchantId ?? ""}
+              onBlur={(event) => saveSource("MERCHANT", event.target.value)}
+              placeholder="Or enter Merchant ID manually"
+            />
+            <button className="btn-outline w-fit" type="button" onClick={loadMerchantAccounts}>
+              {merchantLoading ? "Loading..." : "Refresh Merchant accounts"}
+            </button>
+          </div>
+        </label>
       </div>
       <div className="text-xs text-slate/50">
-        OAuth connection is managed in Admin → Integrations.
+        OAuth connection is managed in Admin -> Integrations.
       </div>
       {message ? <div className="text-sm text-slate/60">{message}</div> : null}
 

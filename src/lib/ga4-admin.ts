@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { getOAuthClient } from "@/lib/google-oauth";
+import { createLimiter, withRetry } from "@/lib/request-limiter";
 
 export type Ga4Property = {
   id: string;
@@ -10,12 +11,16 @@ export type Ga4Property = {
   currencyCode?: string;
 };
 
+const adminLimiter = createLimiter(1);
+
 export async function listGa4Properties(refreshToken: string): Promise<Ga4Property[]> {
   const authClient = getOAuthClient();
   authClient.setCredentials({ refresh_token: refreshToken });
 
   const analyticsAdmin = google.analyticsadmin({ version: "v1beta", auth: authClient });
-  const accountsResponse = await analyticsAdmin.accounts.list({ pageSize: 200 });
+  const accountsResponse = await adminLimiter(() =>
+    withRetry(() => analyticsAdmin.accounts.list({ pageSize: 200 }), { label: "ga4-admin" })
+  );
   const accounts = accountsResponse.data.accounts ?? [];
   const accountMap = new Map(
     accounts
@@ -32,10 +37,16 @@ export async function listGa4Properties(refreshToken: string): Promise<Ga4Proper
     const accountId = account.name?.split("/").pop();
     if (!accountId) continue;
 
-    const propsResponse = await analyticsAdmin.properties.list({
-      filter: `parent:accounts/${accountId}`,
-      pageSize: 200
-    });
+    const propsResponse = await adminLimiter(() =>
+      withRetry(
+        () =>
+          analyticsAdmin.properties.list({
+            filter: `parent:accounts/${accountId}`,
+            pageSize: 200
+          }),
+        { label: "ga4-admin" }
+      )
+    );
 
     for (const prop of propsResponse.data.properties ?? []) {
       const id = prop.name?.split("/").pop();

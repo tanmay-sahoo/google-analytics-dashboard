@@ -1,5 +1,6 @@
 import { GoogleAdsApi } from "google-ads-api";
 import { addDays, formatDateShort } from "@/lib/time";
+import { createLimiter, withRetry } from "@/lib/request-limiter";
 
 export type AdsDailyMetrics = {
   date: Date;
@@ -8,6 +9,8 @@ export type AdsDailyMetrics = {
   impressions: number;
   roas: number;
 };
+
+const adsLimiter = createLimiter(1);
 
 function cleanCustomerId(id: string) {
   return id.replace(/-/g, "");
@@ -52,7 +55,9 @@ export async function fetchAdsDailyMetrics({
     ORDER BY segments.date
   `;
 
-  const rows = await customer.query(query);
+  const rows = await adsLimiter(() =>
+    withRetry(() => customer.query(query), { label: "ads" })
+  );
 
   return rows.map((row: any) => {
     const date = new Date(row.segments.date);
