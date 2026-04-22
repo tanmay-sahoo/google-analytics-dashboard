@@ -8,6 +8,7 @@ import TrendChart from "@/components/TrendChart";
 import Table from "@/components/Table";
 import ProjectDetailClient from "@/components/ProjectDetailClient";
 import { fetchGa4Breakdowns, fetchGa4ProjectReports } from "@/lib/ga4";
+import { getOrRefreshReport } from "@/lib/report-cache";
 
 export default async function ProjectDetailPage({
   params
@@ -76,6 +77,7 @@ export default async function ProjectDetailPage({
   let reports: Awaited<ReturnType<typeof fetchGa4ProjectReports>> | null = null;
   let reportsError: string | null = null;
   const reportEnd = new Date();
+  reportEnd.setHours(0, 0, 0, 0);
   const reportStart = addDays(reportEnd, -29);
 
   function formatRate(value: number) {
@@ -91,10 +93,33 @@ export default async function ProjectDetailPage({
 
   if (ga4Integration?.refreshToken && ga4Id) {
     try {
-      const breakdowns = await fetchGa4Breakdowns({
-        propertyId: ga4Id,
-        refreshToken: ga4Integration.refreshToken
-      });
+      const [breakdowns, snapshot] = await Promise.all([
+        getOrRefreshReport({
+          projectId: project.id,
+          reportKey: "project-breakdowns:v1",
+          rangeStart: reportStart,
+          rangeEnd: reportEnd,
+          fetcher: () =>
+            fetchGa4Breakdowns({
+              propertyId: ga4Id,
+              refreshToken: ga4Integration.refreshToken!
+            })
+        }),
+        getOrRefreshReport({
+          projectId: project.id,
+          reportKey: "snapshot",
+          rangeStart: reportStart,
+          rangeEnd: reportEnd,
+          fetcher: () =>
+            fetchGa4ProjectReports({
+              propertyId: ga4Id,
+              refreshToken: ga4Integration.refreshToken!,
+              startDate: formatDateShort(reportStart),
+              endDate: formatDateShort(reportEnd)
+            })
+        })
+      ]);
+
       campaigns = breakdowns.campaigns.map((row) => [
         row.label,
         formatNumber(row.sessions),
@@ -110,12 +135,7 @@ export default async function ProjectDetailPage({
         formatNumber(row.users),
         formatNumber(row.sessions)
       ]);
-      reports = await fetchGa4ProjectReports({
-        propertyId: ga4Id,
-        refreshToken: ga4Integration.refreshToken,
-        startDate: formatDateShort(reportStart),
-        endDate: formatDateShort(reportEnd)
-      });
+      reports = snapshot;
     } catch (error) {
       campaigns = [];
       sources = [];

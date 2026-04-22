@@ -324,7 +324,7 @@ export default function ProjectDetailClient({
               placeholder="Or enter property ID manually"
             />
             <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("GA4")}>
-              {ga4Loading ? "Loading..." : "Fetch + select in modal"}
+              {ga4Loading ? "Loading..." : "Fetch"}
             </button>
           </div>
         </label>
@@ -351,7 +351,7 @@ export default function ProjectDetailClient({
               placeholder="Or enter customer ID manually (e.g. 123-456-7890)"
             />
             <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("ADS")}>
-              {adsLoading ? "Loading..." : "Fetch + select in modal"}
+              {adsLoading ? "Loading..." : "Fetch"}
             </button>
           </div>
         </label>
@@ -383,12 +383,12 @@ export default function ProjectDetailClient({
               placeholder="Or enter Merchant ID manually"
             />
             <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("MERCHANT")}>
-              {merchantLoading ? "Loading..." : "Fetch + select in modal"}
+              {merchantLoading ? "Loading..." : "Fetch"}
             </button>
           </div>
         </label>
       </div>
-      <div className="text-xs text-slate/50">OAuth connection is managed in Admin -> Integrations.</div>
+      <div className="text-xs text-slate/50">OAuth connection is managed in Admin -&gt; Integrations.</div>
       {message ? <div className="text-sm text-slate/60">{message}</div> : null}
 
       {role === "ADMIN" ? (

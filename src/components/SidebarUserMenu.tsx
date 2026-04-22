@@ -98,11 +98,17 @@ export default function SidebarUserMenu({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`flex items-center gap-3 rounded-2xl border border-slate/10 bg-white/80 px-3 py-3 text-left text-sm ${
-          compact ? "w-12 justify-center px-0" : "w-full"
+        className={`flex items-center gap-3 text-left text-sm transition ${
+          compact
+            ? "h-10 w-10 justify-center rounded-full border border-transparent bg-transparent p-0"
+            : "w-full rounded-2xl border border-slate/15 bg-white/80 px-3 py-3"
         }`}
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate/10 text-sm font-semibold text-slate">
+        <span
+          className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-slate ${
+            compact ? "bg-slate/15" : "bg-slate/10"
+          }`}
+        >
           {initial}
         </span>
         {!compact ? (
@@ -116,7 +122,11 @@ export default function SidebarUserMenu({
       </button>
 
       {open ? (
-        <div className="absolute bottom-16 left-0 z-50 w-72 rounded-2xl border border-slate/10 bg-white p-3 shadow-xl">
+        <div
+          className={`absolute z-50 w-72 rounded-2xl border border-slate/10 bg-white p-3 shadow-xl ${
+            compact ? "bottom-0 left-full ml-3" : "bottom-16 left-0"
+          }`}
+        >
           <div className="px-3 pb-2 text-xs uppercase tracking-[0.2em] text-slate/50">
             {email ?? ""}
           </div>

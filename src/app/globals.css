@@ -4,10 +4,20 @@
 
 :root {
   color-scheme: light;
+  --chart-line: #2b64f2;
+  --chart-grid: #d9e1ee;
+  --chart-text: #64748b;
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: rgba(148, 163, 184, 0.35);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
+  --chart-line: #4f83ff;
+  --chart-grid: rgba(148, 163, 184, 0.3);
+  --chart-text: rgba(226, 232, 240, 0.7);
+  --chart-tooltip-bg: #111827;
+  --chart-tooltip-border: rgba(148, 163, 184, 0.35);
 }
 
 [data-theme="dark"] .app-shell {
@@ -121,6 +131,118 @@
 }
 
 [data-theme="dark"] .label {
+  @apply text-white/50;
+}
+
+/* Ensure dark theme applies immediately from AppShell attribute (prevents route-change flash). */
+.app-shell[data-theme="dark"] {
+  background-color: #0e1116;
+  background-image: none;
+  color: #f8fafc;
+}
+
+.app-shell[data-theme="dark"] main {
+  background-color: #0e1116;
+}
+
+.app-shell[data-theme="dark"] a {
+  @apply text-white/80;
+}
+
+.app-shell[data-theme="dark"] a:hover {
+  @apply text-white;
+}
+
+.app-shell[data-theme="dark"] .text-slate {
+  @apply text-white;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/70 {
+  @apply text-white/70;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/60 {
+  @apply text-white/60;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/80 {
+  @apply text-white/80;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/50 {
+  @apply text-white/50;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/40 {
+  @apply text-white/40;
+}
+
+.app-shell[data-theme="dark"] .text-slate\/30 {
+  @apply text-white/30;
+}
+
+.app-shell[data-theme="dark"] .border-slate\/20,
+.app-shell[data-theme="dark"] .border-slate\/10 {
+  @apply border-white/10;
+}
+
+.app-shell[data-theme="dark"] .bg-white\/80,
+.app-shell[data-theme="dark"] .bg-white\/90,
+.app-shell[data-theme="dark"] .bg-white\/70,
+.app-shell[data-theme="dark"] .bg-white {
+  @apply bg-[#141a26];
+}
+
+.app-shell[data-theme="dark"] .bg-ash {
+  @apply bg-[#0e1116];
+}
+
+.app-shell[data-theme="dark"] header {
+  @apply bg-[#131824] border-white/10;
+}
+
+.app-shell[data-theme="dark"] aside {
+  @apply bg-[#111621] border-white/10;
+}
+
+.app-shell[data-theme="dark"] .card,
+.app-shell[data-theme="dark"] .surface {
+  @apply bg-[#171d2a] text-ash ring-1 ring-white/10;
+}
+
+.app-shell[data-theme="dark"] .btn-outline {
+  @apply border-white/15 text-ash hover:border-white/30 hover:bg-white/5;
+}
+
+.app-shell[data-theme="dark"] .btn-primary {
+  @apply bg-[#2b64f2] text-white hover:bg-[#2355d6];
+}
+
+.app-shell[data-theme="dark"] .input {
+  @apply border-white/10 bg-[#0e121a] text-ash placeholder:text-white/40 focus:border-ocean;
+}
+
+.app-shell[data-theme="dark"] .table th {
+  @apply text-white/40;
+}
+
+.app-shell[data-theme="dark"] .table td {
+  @apply text-white/80;
+}
+
+.app-shell[data-theme="dark"] .muted {
+  @apply text-white/50;
+}
+
+.app-shell[data-theme="dark"] .section-header {
+  @apply border-white/10 bg-[#171d2a];
+}
+
+.app-shell[data-theme="dark"] .chip {
+  @apply border-white/15 bg-[#0f1420] text-white/80;
+}
+
+.app-shell[data-theme="dark"] .label {
   @apply text-white/50;
 }
 

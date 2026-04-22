@@ -220,7 +220,7 @@ export default function AdminIntegrationsClient({
               </form>
             ) : null}
             <button className="btn-outline" type="button" onClick={() => void openPicker("GA4")}>
-              {loading === "GA4" ? "Loading..." : "Fetch + select"}
+              {loading === "GA4" ? "Loading..." : "Fetch"}
             </button>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function AdminIntegrationsClient({
               </form>
             ) : null}
             <button className="btn-outline" type="button" onClick={() => void openPicker("MERCHANT")}>
-              {loading === "MERCHANT" ? "Loading..." : "Fetch + select"}
+              {loading === "MERCHANT" ? "Loading..." : "Fetch"}
             </button>
           </div>
         </div>
@@ -262,7 +262,7 @@ export default function AdminIntegrationsClient({
               </form>
             ) : null}
             <button className="btn-outline" type="button" onClick={() => void openPicker("ADS")}>
-              {loading === "ADS" ? "Loading..." : "Fetch + select"}
+              {loading === "ADS" ? "Loading..." : "Fetch"}
             </button>
           </div>
         </div>

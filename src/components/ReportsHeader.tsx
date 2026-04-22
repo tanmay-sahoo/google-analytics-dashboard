@@ -22,7 +22,12 @@ export default function ReportsHeader({
         <h1 className="page-title">Reports</h1>
         <p className="text-sm text-slate/60">Select a project to view GA4 reports.</p>
       </div>
-      <ProjectSelector projects={projects} value={selectedProjectId} onChange={handleChange} />
+      <ProjectSelector
+        projects={projects}
+        value={selectedProjectId}
+        onChange={handleChange}
+        persistKey="mdh:reports:selectedProjectId"
+      />
     </div>
   );
 }

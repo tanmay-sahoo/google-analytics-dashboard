@@ -1,8 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import ProjectSelector from "@/components/ProjectSelector";
+import DateRangePicker from "@/components/DateRangePicker";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 type DashboardPayload = {
   currency: string;
@@ -142,9 +152,18 @@ function TrendArea({
   dates: string[];
   formatValue: (value: number) => string;
 }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const gradientId = useId().replace(/:/g, "");
+  const chartData = useMemo(
+    () =>
+      points.map((value, index) => ({
+        value,
+        date: dates[index] ?? "",
+        shortDate: formatShortDateLabel(dates[index] ?? "")
+      })),
+    [points, dates]
+  );
 
-  if (!points.length) {
+  if (!chartData.length) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-slate/50">
         No GA4 trend data yet.
@@ -152,118 +171,53 @@ function TrendArea({
     );
   }
 
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  const chartTop = 8;
-  const chartBottom = 86;
-  const chartHeight = chartBottom - chartTop;
-  const mapped = points.map((value, index) => {
-    const x = (index / Math.max(points.length - 1, 1)) * 100;
-    const y = chartTop + (1 - (value - min) / range) * chartHeight;
-    return { x, y };
-  });
-  const line = mapped.map((point) => `${point.x},${point.y}`).join(" ");
-  const areaPath = `M 0,${chartBottom} ${line} 100,${chartBottom}`;
-  const maxIndex = points.indexOf(max);
-  const yTicks = [max, min + range / 2, min];
-  const hover = hoverIndex !== null ? mapped[hoverIndex] : null;
-  const hoverValue = hoverIndex !== null ? points[hoverIndex] : null;
-  const hoverDate = hoverIndex !== null ? dates[hoverIndex] : null;
-
   return (
-    <div className="relative">
-      <svg
-        viewBox="0 0 100 100"
-        className="h-48 w-full sm:h-56 lg:h-64"
-        onMouseMove={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const ratio = (event.clientX - bounds.left) / Math.max(bounds.width, 1);
-          const index = Math.min(
-            points.length - 1,
-            Math.max(0, Math.round(ratio * (points.length - 1)))
-          );
-          setHoverIndex(index);
-        }}
-        onMouseLeave={() => setHoverIndex(null)}
-      >
-        <defs>
-          <linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#2b64f2" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#2b64f2" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <g stroke="#e6e9f0" strokeWidth="0.4">
-          <line x1="0" y1={chartTop} x2="100" y2={chartTop} />
-          <line x1="0" y1={chartTop + chartHeight / 2} x2="100" y2={chartTop + chartHeight / 2} />
-          <line x1="0" y1={chartBottom} x2="100" y2={chartBottom} />
-        </g>
-        <path d={areaPath} fill="url(#trendFill)" stroke="none" />
-        <polyline
-          fill="none"
-          stroke="#2b64f2"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          points={line}
-        />
-        {hover ? (
-          <>
-            <line
-              x1={hover.x}
-              x2={hover.x}
-              y1={chartTop}
-              y2={chartBottom}
-              stroke="#d8deea"
-              strokeWidth="0.6"
-            />
-            <circle
-              cx={hover.x}
-              cy={hover.y}
-              r="2.2"
-              fill="#ffffff"
-              stroke="#2b64f2"
-              strokeWidth="1.2"
-            />
-          </>
-        ) : null}
-        {maxIndex >= 0 ? (
-          <circle
-            cx={mapped[maxIndex]?.x ?? 0}
-            cy={mapped[maxIndex]?.y ?? 0}
-            r="2.2"
-            fill="#ffffff"
-            stroke="#2b64f2"
-            strokeWidth="1.2"
+    <div className="h-56 w-full sm:h-64 lg:h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 2, bottom: 4 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--chart-line)" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="var(--chart-line)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="4 4" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickFormatter={formatShortDateLabel}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: "var(--chart-text)", fontSize: 11 }}
+            minTickGap={24}
           />
-        ) : null}
-      </svg>
-
-      <div className="pointer-events-none absolute inset-y-6 right-0 flex flex-col items-end justify-between text-[10px] text-slate/50">
-        {yTicks.map((value, index) => (
-          <span key={index}>{formatValue(value)}</span>
-        ))}
-      </div>
-
-      <div className="absolute inset-x-0 bottom-2 flex items-center justify-between text-[10px] text-slate/50">
-        <span>{formatShortDateLabel(dates[0] ?? "")}</span>
-        <span>{formatShortDateLabel(dates[Math.floor(dates.length / 2)] ?? "")}</span>
-        <span>{formatShortDateLabel(dates[dates.length - 1] ?? "")}</span>
-      </div>
-
-      {hover && hoverValue !== null ? (
-        <div
-          className="pointer-events-none absolute rounded-xl border border-slate/10 bg-white px-3 py-2 text-xs text-slate shadow-sm"
-          style={{
-            left: `${hover.x}%`,
-            top: `${hover.y}%`,
-            transform: "translate(-50%, -120%)"
-          }}
-        >
-          <div className="text-slate/50">{formatShortDateLabel(hoverDate ?? "")}</div>
-          <div className="text-sm font-semibold">{formatValue(hoverValue)}</div>
-        </div>
-      ) : null}
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: "var(--chart-text)", fontSize: 11 }}
+            width={72}
+            tickFormatter={(value: number) => formatValue(value)}
+          />
+          <Tooltip
+            cursor={{ stroke: "var(--chart-grid)", strokeWidth: 1 }}
+            contentStyle={{
+              backgroundColor: "var(--chart-tooltip-bg)",
+              borderColor: "var(--chart-tooltip-border)",
+              borderRadius: "12px",
+              boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)"
+            }}
+            labelFormatter={(label) => formatShortDateLabel(String(label))}
+            formatter={(value) => [formatValue(Number(value ?? 0)), "Value"]}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="var(--chart-line)"
+            strokeWidth={2.8}
+            fill={`url(#${gradientId})`}
+            activeDot={{ r: 5, strokeWidth: 2, fill: "#fff", stroke: "var(--chart-line)" }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -286,16 +240,32 @@ export default function DashboardClient({
   const [customEnd, setCustomEnd] = useState(initialRange.end);
   const [filterError, setFilterError] = useState<string | null>(null);
 
-  const applyRange = async (projectIdOverride?: string) => {
+  const applyRange = async ({
+    projectIdOverride,
+    rangeOverride,
+    customStartOverride,
+    customEndOverride,
+    compareOverride
+  }: {
+    projectIdOverride?: string;
+    rangeOverride?: RangeKey;
+    customStartOverride?: string;
+    customEndOverride?: string;
+    compareOverride?: boolean;
+  } = {}) => {
     const projectId = projectIdOverride ?? selectedProjectId;
+    const effectiveRange = rangeOverride ?? range;
+    const effectiveCustomStart = customStartOverride ?? customStart;
+    const effectiveCustomEnd = customEndOverride ?? customEnd;
+    const effectiveCompare = compareOverride ?? compare;
     if (!projectId) return;
     setStatus("loading");
     setFilterError(null);
     let start = "";
     let end = "";
-    if (range === "custom") {
-      start = customStart;
-      end = customEnd;
+    if (effectiveRange === "custom") {
+      start = effectiveCustomStart;
+      end = effectiveCustomEnd;
       if (!start || !end) {
         setFilterError("Select both start and end dates.");
         setStatus("idle");
@@ -315,9 +285,9 @@ export default function DashboardClient({
       projectId,
       start,
       end,
-      compare: compare ? "previous" : ""
+      compare: effectiveCompare ? "previous" : ""
     });
-    if (!compare) {
+    if (!effectiveCompare) {
       params.delete("compare");
     }
     const response = await fetch(`/api/metrics/dashboard?${params.toString()}`);
@@ -332,7 +302,7 @@ export default function DashboardClient({
 
   async function handleChange(projectId: string) {
     setSelectedProjectId(projectId);
-    await applyRange(projectId);
+    await applyRange({ projectIdOverride: projectId });
   }
 
   const currency = dashboard?.currency ?? "INR";
@@ -376,12 +346,24 @@ export default function DashboardClient({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {projects.length ? (
-            <ProjectSelector projects={projects} value={selectedProjectId} onChange={handleChange} />
+            <ProjectSelector
+              projects={projects}
+              value={selectedProjectId}
+              onChange={handleChange}
+              persistKey="mdh:dashboard:selectedProjectId"
+            />
           ) : null}
           <select
             className="input max-w-[180px] min-w-[140px]"
             value={range}
-            onChange={(event) => setRange(event.target.value as RangeKey)}
+            onChange={(event) => {
+              const nextRange = event.target.value as RangeKey;
+              setRange(nextRange);
+              setFilterError(null);
+              if (nextRange !== "custom") {
+                void applyRange({ rangeOverride: nextRange });
+              }
+            }}
           >
             {rangeOptions.map((option) => (
               <option key={option.key} value={option.key}>
@@ -390,37 +372,34 @@ export default function DashboardClient({
             ))}
           </select>
           {range === "custom" ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
-                className="input max-w-[160px] min-w-[140px]"
-                value={customStart}
-                max={customEnd || todayDate()}
-                onChange={(event) => setCustomStart(event.target.value)}
-              />
-              <span className="text-xs text-slate/50">to</span>
-              <input
-                type="date"
-                className="input max-w-[160px] min-w-[140px]"
-                value={customEnd}
-                min={customStart || undefined}
-                max={todayDate()}
-                onChange={(event) => setCustomEnd(event.target.value)}
-              />
-            </div>
+            <DateRangePicker
+              start={customStart}
+              end={customEnd}
+              max={todayDate()}
+              onChange={(next) => {
+                setCustomStart(next.start);
+                setCustomEnd(next.end);
+                void applyRange({
+                  rangeOverride: "custom",
+                  customStartOverride: next.start,
+                  customEndOverride: next.end
+                });
+              }}
+            />
           ) : null}
           <label className="flex items-center gap-2 text-sm text-slate/60">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border border-slate/20"
               checked={compare}
-              onChange={(event) => setCompare(event.target.checked)}
+              onChange={(event) => {
+                const nextCompare = event.target.checked;
+                setCompare(nextCompare);
+                void applyRange({ compareOverride: nextCompare });
+              }}
             />
             Compare to previous
           </label>
-          <button type="button" className="btn-primary w-full sm:w-auto" onClick={() => void applyRange()}>
-            Apply
-          </button>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import { addDays, formatDateShort } from "@/lib/time";
+import DateRangePicker from "@/components/DateRangePicker";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -85,13 +86,28 @@ export default function ReportsFilters({
     }
   }
 
-  function applyFilters(nextProjectId = selectedProjectId, forceRefresh = false) {
+  function applyFilters({
+    nextProjectId = selectedProjectId,
+    forceRefresh = false,
+    rangeOverride,
+    customStartOverride,
+    customEndOverride
+  }: {
+    nextProjectId?: string;
+    forceRefresh?: boolean;
+    rangeOverride?: RangeKey;
+    customStartOverride?: string;
+    customEndOverride?: string;
+  } = {}) {
     setError(null);
+    const effectiveRange = rangeOverride ?? selectedRange;
+    const effectiveCustomStart = customStartOverride ?? customStart;
+    const effectiveCustomEnd = customEndOverride ?? customEnd;
     let nextStart = start;
     let nextEnd = end;
-    if (selectedRange === "custom") {
-      nextStart = customStart;
-      nextEnd = customEnd;
+    if (effectiveRange === "custom") {
+      nextStart = effectiveCustomStart;
+      nextEnd = effectiveCustomEnd;
       if (!nextStart || !nextEnd) {
         setError("Select both start and end dates.");
         return;
@@ -108,7 +124,7 @@ export default function ReportsFilters({
     const params = new URLSearchParams({
       projectId: nextProjectId,
       report,
-      range: selectedRange,
+      range: effectiveRange,
       start: nextStart,
       end: nextEnd
     });
@@ -127,7 +143,7 @@ export default function ReportsFilters({
   }
 
   function handleProjectChange(projectId: string) {
-    applyFilters(projectId);
+    applyFilters({ nextProjectId: projectId });
   }
 
   return (
@@ -138,11 +154,23 @@ export default function ReportsFilters({
           <p className="text-sm text-slate/60">Select a project to view GA4 reports.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <ProjectSelector projects={projects} value={selectedProjectId} onChange={handleProjectChange} />
+          <ProjectSelector
+            projects={projects}
+            value={selectedProjectId}
+            onChange={handleProjectChange}
+            persistKey="mdh:reports:selectedProjectId"
+          />
           <select
             className="input max-w-[180px] min-w-[140px]"
             value={selectedRange}
-            onChange={(event) => setSelectedRange(event.target.value as RangeKey)}
+            onChange={(event) => {
+              const nextRange = event.target.value as RangeKey;
+              setSelectedRange(nextRange);
+              setError(null);
+              if (nextRange !== "custom") {
+                applyFilters({ rangeOverride: nextRange });
+              }
+            }}
           >
             {rangeOptions.map((option) => (
               <option key={option.key} value={option.key}>
@@ -151,27 +179,20 @@ export default function ReportsFilters({
             ))}
           </select>
           {selectedRange === "custom" ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
-                className="input max-w-[160px] min-w-[140px]"
-                value={customStart}
-                max={customEnd}
-                onChange={(event) => setCustomStart(event.target.value)}
-              />
-              <span className="text-xs text-slate/50">to</span>
-              <input
-                type="date"
-                className="input max-w-[160px] min-w-[140px]"
-                value={customEnd}
-                min={customStart}
-                onChange={(event) => setCustomEnd(event.target.value)}
-              />
-            </div>
+            <DateRangePicker
+              start={customStart}
+              end={customEnd}
+              onChange={(next) => {
+                setCustomStart(next.start);
+                setCustomEnd(next.end);
+                applyFilters({
+                  rangeOverride: "custom",
+                  customStartOverride: next.start,
+                  customEndOverride: next.end
+                });
+              }}
+            />
           ) : null}
-          <button type="button" className="btn-primary w-full sm:w-auto" onClick={() => applyFilters()}>
-            Apply
-          </button>
         </div>
       </div>
       {error ? <div className="alert">{error}</div> : null}

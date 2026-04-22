@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
   Bell,
@@ -48,7 +49,12 @@ export function SidebarContent({
   onNavigate?: () => void;
   collapsed?: boolean;
 }) {
+  const pathname = usePathname() ?? "";
   const [projectOpen, setProjectOpen] = useState(true);
+
+  const isPathActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const projectSectionActive =
+    isPathActive("/projects") || isPathActive("/reports") || isPathActive("/merchant");
 
   return (
     <>
@@ -92,7 +98,13 @@ export function SidebarContent({
                 <button
                   type="button"
                   onClick={() => setProjectOpen((value) => !value)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-slate/70 transition hover:bg-slate/5 hover:text-slate"
+                  className={`flex w-full items-center rounded-xl py-2 transition ${
+                    projectSectionActive
+                      ? "bg-slate/10 text-slate"
+                      : "text-slate/80 hover:bg-slate/5 hover:text-slate"
+                  } ${
+                    collapsed ? "justify-center px-2" : "gap-3 px-3"
+                  }`}
                 >
                   <Icon size={18} />
                   <span className={collapsed ? "sr-only" : ""}>{t(locale, "projectMenu")}</span>
@@ -107,21 +119,33 @@ export function SidebarContent({
                     <Link
                       href="/projects"
                       onClick={onNavigate}
-                      className="ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs text-slate/50 transition hover:bg-slate/5 hover:text-slate/70"
+                      className={`ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs transition ${
+                        isPathActive("/projects")
+                          ? "bg-slate/10 text-slate"
+                          : "text-slate/60 hover:bg-slate/5 hover:text-slate/80"
+                      }`}
                     >
                       {t(locale, "projects")}
                     </Link>
                     <Link
                       href="/reports"
                       onClick={onNavigate}
-                      className="ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs text-slate/50 transition hover:bg-slate/5 hover:text-slate/70"
+                      className={`ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs transition ${
+                        isPathActive("/reports")
+                          ? "bg-slate/10 text-slate"
+                          : "text-slate/60 hover:bg-slate/5 hover:text-slate/80"
+                      }`}
                     >
                       {t(locale, "reports")}
                     </Link>
                     <Link
                       href="/merchant"
                       onClick={onNavigate}
-                      className="ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs text-slate/50 transition hover:bg-slate/5 hover:text-slate/70"
+                      className={`ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs transition ${
+                        isPathActive("/merchant")
+                          ? "bg-slate/10 text-slate"
+                          : "text-slate/60 hover:bg-slate/5 hover:text-slate/80"
+                      }`}
                     >
                       {t(locale, "merchant")}
                     </Link>
@@ -131,12 +155,17 @@ export function SidebarContent({
             );
           }
 
+          const active = isPathActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={onNavigate}
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-slate/70 transition hover:bg-slate/5 hover:text-slate"
+              className={`flex items-center rounded-xl py-2 transition ${
+                active ? "bg-slate/10 text-slate" : "text-slate/80 hover:bg-slate/5 hover:text-slate"
+              } ${
+                collapsed ? "justify-center px-2" : "gap-3 px-3"
+              }`}
             >
               <Icon size={18} />
               <span className={collapsed ? "sr-only" : ""}>{label}</span>
@@ -185,10 +214,12 @@ export default function Sidebar({
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate/20 bg-slate text-white shadow-sm transition hover:opacity-90"
+        className={`mb-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate/20 bg-slate text-white shadow-sm transition hover:bg-slate/90 ${
+          collapsed ? "self-center" : "ml-auto"
+        }`}
         aria-label="Toggle sidebar"
       >
-        {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
       <SidebarContent
         role={role}

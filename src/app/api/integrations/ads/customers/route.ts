@@ -155,6 +155,13 @@ export async function GET() {
     }
   }
 
+  // If MCC is configured and we successfully discovered clients from that MCC tree,
+  // prefer that exact hierarchy and do not mix unrelated directly-accessible accounts.
+  if (managerCustomerId && customersMap.size > 0) {
+    const customers = Array.from(customersMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return NextResponse.json({ customers });
+  }
+
   for (const resource of resourceNames) {
     const id = resource.split("/").pop() ?? resource;
     const customerId = cleanCustomerId(id);

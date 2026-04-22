@@ -169,7 +169,7 @@ export default async function ReportsPage({
       />
 
       <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="card h-fit space-y-2">
+        <div className="card sticky top-0 z-10 h-fit space-y-2 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
           {menu.map((item) => {
             const active = item.key === reportKey;
             const params = new URLSearchParams(filterParams);
