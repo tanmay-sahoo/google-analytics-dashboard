@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LayoutGrid, Bell, Users, FolderKanban, Plug, Settings, ListChecks } from "lucide-react";
+import {
+  LayoutGrid,
+  Bell,
+  Users,
+  FolderKanban,
+  Plug,
+  Settings,
+  ListChecks,
+  ChevronDown,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen
+} from "lucide-react";
 import SidebarUserMenu from "@/components/SidebarUserMenu";
 import { t } from "@/lib/i18n";
 
@@ -53,6 +65,7 @@ export function SidebarContent({
           ) {
             return null;
           }
+
           const Icon = item.icon;
           const label = t(
             locale,
@@ -83,7 +96,11 @@ export function SidebarContent({
                 >
                   <Icon size={18} />
                   <span className={collapsed ? "sr-only" : ""}>{t(locale, "projectMenu")}</span>
-                  {!collapsed ? <span className="ml-auto text-xs text-slate/40">{projectOpen ? "▾" : "▸"}</span> : null}
+                  {!collapsed ? (
+                    <span className="ml-auto text-xs text-slate/40">
+                      {projectOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                  ) : null}
                 </button>
                 {!collapsed && projectOpen ? (
                   <>
@@ -161,17 +178,17 @@ export default function Sidebar({
 }) {
   return (
     <aside
-      className={`sticky top-0 z-40 hidden h-screen flex-col overflow-visible border-r border-slate-200/70 bg-white/80 px-4 py-6 transition-all lg:flex ${
+      className={`sticky top-0 z-40 hidden h-screen flex-col overflow-visible border-r border-slate-200/70 bg-white/80 px-4 py-6 transition-all duration-200 lg:flex ${
         collapsed ? "w-20" : "w-64"
       }`}
     >
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="mb-4 flex h-10 items-center justify-center rounded-xl border border-slate/10 bg-white/80 text-slate/60 hover:bg-slate/5"
+        className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate/20 bg-slate text-white shadow-sm transition hover:opacity-90"
         aria-label="Toggle sidebar"
       >
-        {collapsed ? "»" : "«"}
+        {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
       </button>
       <SidebarContent
         role={role}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+type PickerType = "GA4" | "ADS" | "MERCHANT";
 
 export default function ProjectDetailClient({
   projectId,
@@ -21,12 +23,19 @@ export default function ProjectDetailClient({
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedGa4Id, setSelectedGa4Id] = useState(ga4Id ?? "");
+  const [selectedAdsId, setSelectedAdsId] = useState(adsId ?? "");
+  const [selectedMerchantId, setSelectedMerchantId] = useState(merchantId ?? "");
   const [ga4Properties, setGa4Properties] = useState<
     { id: string; displayName: string; accountName?: string }[]
   >([]);
   const [ga4Loading, setGa4Loading] = useState(false);
   const [merchantAccounts, setMerchantAccounts] = useState<{ id: string; name: string }[]>([]);
   const [merchantLoading, setMerchantLoading] = useState(false);
+  const [adsCustomers, setAdsCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [pickerType, setPickerType] = useState<PickerType | null>(null);
+  const [pickerQuery, setPickerQuery] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -35,7 +44,21 @@ export default function ProjectDetailClient({
   const cacheTimeKey = "mdh_ga4_properties_cache_time";
   const merchantCacheKey = "mdh_merchant_accounts_cache";
   const merchantCacheTimeKey = "mdh_merchant_accounts_cache_time";
+  const adsCacheKey = "mdh_ads_customers_cache";
+  const adsCacheTimeKey = "mdh_ads_customers_cache_time";
   const cacheTtlMs = 6 * 60 * 60 * 1000;
+
+  useEffect(() => {
+    setSelectedGa4Id(ga4Id ?? "");
+  }, [ga4Id]);
+
+  useEffect(() => {
+    setSelectedAdsId(adsId ?? "");
+  }, [adsId]);
+
+  useEffect(() => {
+    setSelectedMerchantId(merchantId ?? "");
+  }, [merchantId]);
 
   useEffect(() => {
     const cached = localStorage.getItem(cacheKey);
@@ -54,6 +77,25 @@ export default function ProjectDetailClient({
       void loadGa4Properties();
     }
   }, []);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(adsCacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as typeof adsCustomers;
+        if (Array.isArray(parsed)) {
+          setAdsCustomers(parsed);
+        }
+      } catch {
+        // Ignore bad cache.
+      }
+    }
+    const lastFetched = Number(localStorage.getItem(adsCacheTimeKey) ?? 0);
+    if (Date.now() - lastFetched > cacheTtlMs) {
+      void loadAdsCustomers();
+    }
+  }, []);
+
   useEffect(() => {
     const cached = localStorage.getItem(merchantCacheKey);
     if (cached) {
@@ -69,10 +111,13 @@ export default function ProjectDetailClient({
     void loadMerchantAccounts();
   }, []);
 
-  async function saveSource(type: "GA4" | "ADS" | "MERCHANT", externalId: string) {
-    if (!externalId || externalId.trim().length < 2) {
-      return;
-    }
+  async function saveSource(type: PickerType, externalId: string) {
+    if (!externalId || externalId.trim().length < 2) return;
+
+    if (type === "GA4") setSelectedGa4Id(externalId);
+    if (type === "ADS") setSelectedAdsId(externalId);
+    if (type === "MERCHANT") setSelectedMerchantId(externalId);
+
     setMessage(null);
     const response = await fetch("/api/datasources", {
       method: "POST",
@@ -82,10 +127,11 @@ export default function ProjectDetailClient({
 
     if (response.ok) {
       setMessage("Data source saved.");
-    } else {
-      const data = await response.json().catch(() => ({}));
-      setMessage(data.error ?? "Failed to save data source.");
+      return;
     }
+
+    const data = await response.json().catch(() => ({}));
+    setMessage(data.error ?? "Failed to save data source.");
   }
 
   async function syncNow() {
@@ -139,6 +185,40 @@ export default function ProjectDetailClient({
     setMerchantLoading(false);
   }
 
+  async function loadAdsCustomers() {
+    setAdsLoading(true);
+    setMessage(null);
+    const response = await fetch("/api/integrations/ads/customers");
+    if (response.ok) {
+      const data = await response.json();
+      const list = (data.customers ?? []).map((item: { id: string; name?: string }) => ({
+        id: item.id,
+        name: item.name ?? item.id
+      }));
+      setAdsCustomers(list);
+      localStorage.setItem(adsCacheKey, JSON.stringify(list));
+      localStorage.setItem(adsCacheTimeKey, String(Date.now()));
+    } else {
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.error ?? "Failed to load Ads customers.");
+    }
+    setAdsLoading(false);
+  }
+
+  async function openPicker(type: PickerType) {
+    setPickerType(type);
+    setPickerQuery("");
+    if (type === "GA4" && ga4Properties.length === 0) await loadGa4Properties();
+    if (type === "ADS" && adsCustomers.length === 0) await loadAdsCustomers();
+    if (type === "MERCHANT" && merchantAccounts.length === 0) await loadMerchantAccounts();
+  }
+
+  async function refreshPickerList() {
+    if (pickerType === "GA4") await loadGa4Properties();
+    if (pickerType === "ADS") await loadAdsCustomers();
+    if (pickerType === "MERCHANT") await loadMerchantAccounts();
+  }
+
   async function deleteProject() {
     setDeleteError(null);
     if (confirmName.trim() !== projectName) {
@@ -155,6 +235,58 @@ export default function ProjectDetailClient({
     setDeleteError(data.error ?? "Failed to delete project.");
     setDeleteLoading(false);
   }
+
+  const pickerItems = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+
+    if (pickerType === "GA4") {
+      return ga4Properties
+        .map((item) => ({
+          id: item.id,
+          title: item.displayName,
+          subtitle: `${item.accountName ?? "-"} - Property ID: ${item.id}`,
+          disabled: false
+        }))
+        .filter((item) => !q || `${item.title} ${item.subtitle}`.toLowerCase().includes(q));
+    }
+
+    if (pickerType === "ADS") {
+      return adsCustomers
+        .map((item) => ({
+          id: item.id,
+          title: item.name,
+          subtitle: `Customer ID: ${item.id}`,
+          disabled: false
+        }))
+        .filter((item) => !q || `${item.title} ${item.subtitle}`.toLowerCase().includes(q));
+    }
+
+    if (pickerType === "MERCHANT") {
+      return merchantAccounts
+        .map((item) => {
+          const inUse = assignedMerchantIds.includes(item.id) && item.id !== selectedMerchantId;
+          return {
+            id: item.id,
+            title: item.name,
+            subtitle: `Merchant ID: ${item.id}${inUse ? " (in use)" : ""}`,
+            disabled: inUse
+          };
+        })
+        .filter((item) => !q || `${item.title} ${item.subtitle}`.toLowerCase().includes(q));
+    }
+
+    return [];
+  }, [pickerType, pickerQuery, ga4Properties, adsCustomers, merchantAccounts, assignedMerchantIds, selectedMerchantId]);
+
+  const pickerTitle =
+    pickerType === "GA4"
+      ? "Select GA4 property"
+      : pickerType === "ADS"
+      ? "Select Ads customer"
+      : "Select Merchant account";
+
+  const pickerLoading =
+    pickerType === "GA4" ? ga4Loading : pickerType === "ADS" ? adsLoading : merchantLoading;
 
   return (
     <div className="card space-y-4">
@@ -173,8 +305,8 @@ export default function ProjectDetailClient({
           <div className="flex flex-col gap-2">
             <select
               className="input"
-              value={ga4Id ?? ""}
-              onChange={(event) => saveSource("GA4", event.target.value)}
+              value={selectedGa4Id}
+              onChange={(event) => void saveSource("GA4", event.target.value)}
             >
               <option value="">Select GA4 property</option>
               {ga4Properties.map((prop) => (
@@ -186,59 +318,77 @@ export default function ProjectDetailClient({
             </select>
             <input
               className="input"
-              defaultValue={ga4Id ?? ""}
-              onBlur={(event) => saveSource("GA4", event.target.value)}
+              value={selectedGa4Id}
+              onChange={(event) => setSelectedGa4Id(event.target.value)}
+              onBlur={(event) => void saveSource("GA4", event.target.value)}
               placeholder="Or enter property ID manually"
             />
-            <button className="btn-outline w-fit" type="button" onClick={loadGa4Properties}>
-              {ga4Loading ? "Loading..." : "Fetch GA4 properties"}
+            <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("GA4")}>
+              {ga4Loading ? "Loading..." : "Fetch + select in modal"}
             </button>
           </div>
         </label>
         <label className="space-y-2 text-sm">
           <div className="text-slate/70">Google Ads Customer ID</div>
-          <input
-            className="input"
-            defaultValue={adsId ?? ""}
-            onBlur={(event) => saveSource("ADS", event.target.value)}
-            placeholder="e.g. 123-456-7890"
-          />
+          <div className="flex flex-col gap-2">
+            <select
+              className="input"
+              value={selectedAdsId}
+              onChange={(event) => void saveSource("ADS", event.target.value)}
+            >
+              <option value="">Select Ads customer</option>
+              {adsCustomers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name} - {customer.id}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input"
+              value={selectedAdsId}
+              onChange={(event) => setSelectedAdsId(event.target.value)}
+              onBlur={(event) => void saveSource("ADS", event.target.value)}
+              placeholder="Or enter customer ID manually (e.g. 123-456-7890)"
+            />
+            <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("ADS")}>
+              {adsLoading ? "Loading..." : "Fetch + select in modal"}
+            </button>
+          </div>
         </label>
         <label className="space-y-2 text-sm">
           <div className="text-slate/70">Merchant Center Account ID</div>
           <div className="flex flex-col gap-2">
             <select
               className="input"
-              value={merchantId ?? ""}
-              onChange={(event) => saveSource("MERCHANT", event.target.value)}
+              value={selectedMerchantId}
+              onChange={(event) => void saveSource("MERCHANT", event.target.value)}
             >
               <option value="">Select Merchant account</option>
               {merchantAccounts.map((account) => (
                 <option
                   key={account.id}
                   value={account.id}
-                  disabled={assignedMerchantIds.includes(account.id) && account.id !== merchantId}
+                  disabled={assignedMerchantIds.includes(account.id) && account.id !== selectedMerchantId}
                 >
                   {account.name} - {account.id}
-                  {assignedMerchantIds.includes(account.id) && account.id !== merchantId ? " (in use)" : ""}
+                  {assignedMerchantIds.includes(account.id) && account.id !== selectedMerchantId ? " (in use)" : ""}
                 </option>
               ))}
             </select>
             <input
               className="input"
-              defaultValue={merchantId ?? ""}
-              onBlur={(event) => saveSource("MERCHANT", event.target.value)}
+              value={selectedMerchantId}
+              onChange={(event) => setSelectedMerchantId(event.target.value)}
+              onBlur={(event) => void saveSource("MERCHANT", event.target.value)}
               placeholder="Or enter Merchant ID manually"
             />
-            <button className="btn-outline w-fit" type="button" onClick={loadMerchantAccounts}>
-              {merchantLoading ? "Loading..." : "Refresh Merchant accounts"}
+            <button className="btn-outline w-fit" type="button" onClick={() => void openPicker("MERCHANT")}>
+              {merchantLoading ? "Loading..." : "Fetch + select in modal"}
             </button>
           </div>
         </label>
       </div>
-      <div className="text-xs text-slate/50">
-        OAuth connection is managed in Admin -> Integrations.
-      </div>
+      <div className="text-xs text-slate/50">OAuth connection is managed in Admin -> Integrations.</div>
       {message ? <div className="text-sm text-slate/60">{message}</div> : null}
 
       {role === "ADMIN" ? (
@@ -246,6 +396,56 @@ export default function ProjectDetailClient({
           <button className="btn-outline" onClick={() => setShowDelete(true)}>
             Delete project
           </button>
+        </div>
+      ) : null}
+
+      {pickerType ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate/30 px-4">
+          <div className="card w-full max-w-2xl">
+            <div className="flex items-center justify-between gap-2">
+              <div className="label">{pickerTitle}</div>
+              <div className="flex items-center gap-2">
+                <button className="btn-outline" onClick={() => void refreshPickerList()} disabled={pickerLoading}>
+                  {pickerLoading ? "Refreshing..." : "Refresh"}
+                </button>
+                <button className="btn-outline" onClick={() => setPickerType(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 space-y-3">
+              <input
+                className="input"
+                placeholder="Search by name or ID"
+                value={pickerQuery}
+                onChange={(event) => setPickerQuery(event.target.value)}
+              />
+              <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                {pickerItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={item.disabled}
+                    onClick={() => {
+                      if (pickerType) {
+                        void saveSource(pickerType, item.id);
+                      }
+                      setPickerType(null);
+                    }}
+                    className="w-full rounded-xl border border-slate/15 px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div className="text-sm font-semibold text-slate">{item.title}</div>
+                    <div className="text-xs text-slate/60">{item.subtitle}</div>
+                  </button>
+                ))}
+                {pickerItems.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate/20 p-4 text-sm text-slate/60">
+                    No results found.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -270,11 +470,7 @@ export default function ProjectDetailClient({
               />
               {deleteError ? <div className="text-sm text-red-600">{deleteError}</div> : null}
               <div className="flex items-center gap-2">
-                <button
-                  className="btn-primary"
-                  disabled={deleteLoading}
-                  onClick={deleteProject}
-                >
+                <button className="btn-primary" disabled={deleteLoading} onClick={deleteProject}>
                   {deleteLoading ? "Deleting..." : "Confirm delete"}
                 </button>
                 <button className="btn-outline" onClick={() => setShowDelete(false)}>

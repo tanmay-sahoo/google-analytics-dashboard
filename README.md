@@ -66,4 +66,4 @@ Default admin:
 ## Google OAuth integration
 - Create a Google Cloud OAuth client (Web app) and set the redirect URI to `GOOGLE_REDIRECT_URI`.
 - Enable the GA4 Data API and Google Ads API in the project.
-- Provide a Google Ads developer token and optional manager customer ID if using MCC.
+- Provide a Google Ads developer token. Manager customer ID is optional and only needed when using an MCC. Leave it empty for direct-access accounts. If you hit a 404, set `GOOGLE_ADS_API_VERSION` (default `v19`) to a supported Ads API version.
