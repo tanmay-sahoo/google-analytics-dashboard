@@ -8,6 +8,7 @@ import { getOrRefreshReport } from "@/lib/report-cache";
 import ReportsFilters from "@/components/ReportsFilters";
 import TrendChart from "@/components/TrendChart";
 import ReportsDataTable from "@/components/ReportsDataTable";
+import Tabs from "@/components/Tabs";
 
 export default async function ReportsPage({
   searchParams
@@ -19,6 +20,7 @@ export default async function ReportsPage({
     start?: string;
     end?: string;
     refresh?: string;
+    subtab?: string;
   }>;
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -163,6 +165,31 @@ export default async function ReportsPage({
     end: formatDateShort(reportEnd)
   });
 
+  const engagementSubtabs = [
+    { key: "events", label: "Top events" },
+    { key: "pages", label: "Top pages" },
+    { key: "least-pages", label: "Least visited pages" },
+    { key: "search-terms", label: "Search terms" }
+  ];
+  const techSubtabs = [
+    { key: "platform", label: "Platform" },
+    { key: "os", label: "Operating system" },
+    { key: "browser", label: "Browser" },
+    { key: "device", label: "Device category" },
+    { key: "platform-device", label: "Platform / device" }
+  ];
+  const requestedSubtab = resolvedSearchParams?.subtab ?? "";
+  const engagementSubtab =
+    engagementSubtabs.find((item) => item.key === requestedSubtab)?.key ?? "events";
+  const techSubtab =
+    techSubtabs.find((item) => item.key === requestedSubtab)?.key ?? "platform";
+  const subtabHref = (key: string) => {
+    const params = new URLSearchParams(filterParams);
+    params.set("report", reportKey);
+    params.set("subtab", key);
+    return `/reports?${params.toString()}`;
+  };
+
   return (
     <div className="space-y-8">
       <ReportsFilters
@@ -174,6 +201,7 @@ export default async function ReportsPage({
         end={formatDateShort(reportEnd)}
         refresh={resolvedSearchParams?.refresh}
         basePath="/reports"
+        urlHadRange={Boolean(resolvedSearchParams?.range)}
       />
 
       <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -270,66 +298,143 @@ export default async function ReportsPage({
                       <div className="kpi">{reports.engagement.sessionsPerUser.toFixed(2)}</div>
                     </div>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="label">Top events</div>
-                        <a className="text-xs text-ocean" href={`/reports/top-events?${filterParams.toString()}`}>
-                          View all
-                        </a>
-                      </div>
-                      <ReportsDataTable
-                        title="Top events"
-                        dimensionLabel="Event"
-                        columns={[{ label: "Event count" }]}
-                        rows={reports.topEvents.map((row) => ({ label: row.label, values: [row.value] }))}
+                  {reportKey === "engagement" ? (
+                    <div className="space-y-4">
+                      <Tabs
+                        ariaLabel="Engagement breakdowns"
+                        items={engagementSubtabs}
+                        activeKey={engagementSubtab}
+                        buildHref={(key) => subtabHref(key)}
                       />
+                      {engagementSubtab === "events" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Top events</div>
+                            <a className="text-xs text-ocean" href={`/reports/top-events?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Top events"
+                            dimensionLabel="Event"
+                            columns={[{ label: "Event count" }]}
+                            rows={reports.topEvents.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                      )}
+                      {engagementSubtab === "pages" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Top pages</div>
+                            <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Top pages"
+                            dimensionLabel="Page"
+                            columns={[{ label: "Views" }]}
+                            rows={reports.topPages.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                      )}
+                      {engagementSubtab === "least-pages" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Least visited pages</div>
+                            <a className="text-xs text-ocean" href={`/reports/least-pages?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Least visited pages"
+                            dimensionLabel="Page"
+                            columns={[{ label: "Views" }]}
+                            rows={reports.leastPages.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                      )}
+                      {engagementSubtab === "search-terms" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Search terms</div>
+                            <a className="text-xs text-ocean" href={`/reports/search-terms?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Search terms"
+                            dimensionLabel="Search term"
+                            columns={[{ label: "Sessions" }]}
+                            rows={reports.searchTerms.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="label">Top pages</div>
-                        <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
-                          View all
-                        </a>
+                  ) : (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Top events</div>
+                            <a className="text-xs text-ocean" href={`/reports/top-events?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Top events"
+                            dimensionLabel="Event"
+                            columns={[{ label: "Event count" }]}
+                            rows={reports.topEvents.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Top pages</div>
+                            <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Top pages"
+                            dimensionLabel="Page"
+                            columns={[{ label: "Views" }]}
+                            rows={reports.topPages.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
                       </div>
-                      <ReportsDataTable
-                        title="Top pages"
-                        dimensionLabel="Page"
-                        columns={[{ label: "Views" }]}
-                        rows={reports.topPages.map((row) => ({ label: row.label, values: [row.value] }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="label">Least visited pages</div>
-                        <a className="text-xs text-ocean" href={`/reports/least-pages?${filterParams.toString()}`}>
-                          View all
-                        </a>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Least visited pages</div>
+                            <a className="text-xs text-ocean" href={`/reports/least-pages?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Least visited pages"
+                            dimensionLabel="Page"
+                            columns={[{ label: "Views" }]}
+                            rows={reports.leastPages.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="label">Search terms</div>
+                            <a className="text-xs text-ocean" href={`/reports/search-terms?${filterParams.toString()}`}>
+                              View all
+                            </a>
+                          </div>
+                          <ReportsDataTable
+                            title="Search terms"
+                            dimensionLabel="Search term"
+                            columns={[{ label: "Sessions" }]}
+                            rows={reports.searchTerms.map((row) => ({ label: row.label, values: [row.value] }))}
+                          />
+                        </div>
                       </div>
-                      <ReportsDataTable
-                        title="Least visited pages"
-                        dimensionLabel="Page"
-                        columns={[{ label: "Views" }]}
-                        rows={reports.leastPages.map((row) => ({ label: row.label, values: [row.value] }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="label">Search terms</div>
-                        <a className="text-xs text-ocean" href={`/reports/search-terms?${filterParams.toString()}`}>
-                          View all
-                        </a>
-                      </div>
-                      <ReportsDataTable
-                        title="Search terms"
-                        dimensionLabel="Search term"
-                        columns={[{ label: "Sessions" }]}
-                        rows={reports.searchTerms.map((row) => ({ label: row.label, values: [row.value] }))}
-                      />
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -390,8 +495,16 @@ export default async function ReportsPage({
 
               {(reportKey === "snapshot" || reportKey === "retention") && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <TrendChart points={reports.retention.newUsers} label="New users (30 days)" />
-                  <TrendChart points={reports.retention.returningUsers} label="Returning users (30 days)" />
+                  <TrendChart
+                    points={reports.retention.newUsers}
+                    dates={reports.retention.dates}
+                    label="New users (30 days)"
+                  />
+                  <TrendChart
+                    points={reports.retention.returningUsers}
+                    dates={reports.retention.dates}
+                    label="Returning users (30 days)"
+                  />
                 </div>
               )}
 
@@ -431,7 +544,13 @@ export default async function ReportsPage({
 
               {reportKey === "tech" && (
                 <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <Tabs
+                    ariaLabel="Tech breakdowns"
+                    items={techSubtabs}
+                    activeKey={techSubtab}
+                    buildHref={(key) => subtabHref(key)}
+                  />
+                  {techSubtab === "platform" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Platform</div>
@@ -446,6 +565,8 @@ export default async function ReportsPage({
                         rows={reports.tech.platform.map((row) => ({ label: row.label, values: [row.value] }))}
                       />
                     </div>
+                  )}
+                  {techSubtab === "os" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Operating system</div>
@@ -460,6 +581,8 @@ export default async function ReportsPage({
                         rows={reports.tech.operatingSystem.map((row) => ({ label: row.label, values: [row.value] }))}
                       />
                     </div>
+                  )}
+                  {techSubtab === "browser" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Browser</div>
@@ -474,8 +597,8 @@ export default async function ReportsPage({
                         rows={reports.tech.browser.map((row) => ({ label: row.label, values: [row.value] }))}
                       />
                     </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  )}
+                  {techSubtab === "device" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Device category</div>
@@ -490,6 +613,8 @@ export default async function ReportsPage({
                         rows={reports.tech.deviceCategory.map((row) => ({ label: row.label, values: [row.value] }))}
                       />
                     </div>
+                  )}
+                  {techSubtab === "platform-device" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Platform / device</div>
@@ -504,7 +629,7 @@ export default async function ReportsPage({
                         rows={reports.tech.platformDevice.map((row) => ({ label: row.label, values: [row.value] }))}
                       />
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

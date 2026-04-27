@@ -50,7 +50,9 @@ export async function POST(request: Request) {
     projectId: string;
     ga4Inserted: number;
     adsInserted: number;
+    error?: string;
   }[] = [];
+  let failedProjects = 0;
 
   const run = await prisma.ingestionRun.create({
     data: {
@@ -73,6 +75,10 @@ export async function POST(request: Request) {
         startedAt: new Date()
       }
     });
+
+    let ga4Inserted = 0;
+    let adsInserted = 0;
+    const projectErrors: string[] = [];
 
     try {
       const latestGa4 = await prisma.metricDaily.findFirst({
@@ -125,9 +131,13 @@ export async function POST(request: Request) {
           }
         });
       }
+      ga4Inserted = ga4Metrics.length;
+    } catch (error) {
+      projectErrors.push(`GA4: ${error instanceof Error ? error.message : "Ingestion failed"}`);
+    }
 
-      let adsInserted = 0;
-      if (adsIntegration?.refreshToken && adsSource?.externalId) {
+    if (adsIntegration?.refreshToken && adsSource?.externalId) {
+      try {
         const adsMetrics = await fetchAdsDailyMetrics({
           customerId: adsSource.externalId,
           refreshToken: adsIntegration.refreshToken
@@ -167,41 +177,46 @@ export async function POST(request: Request) {
           });
           adsInserted += 1;
         }
+      } catch (error) {
+        projectErrors.push(`ADS: ${error instanceof Error ? error.message : "Ingestion failed"}`);
       }
-
-      results.push({
-        projectId: project.id,
-        ga4Inserted: ga4Metrics.length,
-        adsInserted
-      });
-
-      await prisma.ingestionProjectLog.update({
-        where: { id: projectLog.id },
-        data: {
-          ga4Inserted: ga4Metrics.length,
-          adsInserted,
-          finishedAt: new Date()
-        }
-      });
-    } catch (error) {
-      await prisma.ingestionProjectLog.update({
-        where: { id: projectLog.id },
-        data: {
-          error: error instanceof Error ? error.message : "Ingestion failed",
-          finishedAt: new Date()
-        }
-      });
     }
+
+    const projectError = projectErrors.length ? projectErrors.join(" | ") : undefined;
+    if (projectError) {
+      failedProjects += 1;
+    }
+
+    results.push({
+      projectId: project.id,
+      ga4Inserted,
+      adsInserted,
+      error: projectError
+    });
+
+    await prisma.ingestionProjectLog.update({
+      where: { id: projectLog.id },
+      data: {
+        ga4Inserted,
+        adsInserted,
+        error: projectError,
+        finishedAt: new Date()
+      }
+    });
   }
 
   await prisma.ingestionRun.update({
     where: { id: run.id },
     data: {
-      status: "COMPLETED",
+      status: failedProjects > 0 ? "FAILED" : "COMPLETED",
       finishedAt: new Date(),
       totalProjects: results.length,
       totalGa4: results.reduce((sum, item) => sum + item.ga4Inserted, 0),
-      totalAds: results.reduce((sum, item) => sum + item.adsInserted, 0)
+      totalAds: results.reduce((sum, item) => sum + item.adsInserted, 0),
+      error:
+        failedProjects > 0
+          ? `${failedProjects} project(s) had ingestion errors.`
+          : null
     }
   });
 

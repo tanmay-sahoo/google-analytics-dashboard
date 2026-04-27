@@ -11,12 +11,26 @@ import {
   YAxis
 } from "recharts";
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = MONTHS[date.getMonth()] ?? "";
+  return `${day} ${month}`;
+}
+
 export default function TrendChart({
   points,
-  label
+  label,
+  dates,
+  formatValue
 }: {
   points: number[];
   label: string;
+  dates?: string[];
+  formatValue?: (value: number) => string;
 }) {
   const fillId = useId().replace(/:/g, "");
 
@@ -31,10 +45,13 @@ export default function TrendChart({
     );
   }
 
+  const hasDates = Array.isArray(dates) && dates.length === points.length;
   const chartData = points.map((value, index) => ({
-    label: `P${index + 1}`,
+    label: hasDates ? dates![index] : `P${index + 1}`,
     value
   }));
+  const formatXTick = hasDates ? (raw: string) => formatShortDate(raw) : (raw: string) => raw;
+  const formatY = formatValue ?? ((value: number) => Number(value ?? 0).toLocaleString());
 
   return (
     <div className="card">
@@ -51,17 +68,19 @@ export default function TrendChart({
             <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="label"
+              tickFormatter={formatXTick}
               tickLine={false}
               axisLine={false}
               tick={{ fill: "var(--chart-text)", fontSize: 11 }}
               interval="preserveStartEnd"
-              minTickGap={30}
+              minTickGap={hasDates ? 24 : 30}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tick={{ fill: "var(--chart-text)", fontSize: 11 }}
-              width={36}
+              width={48}
+              tickFormatter={(value: number) => formatY(value)}
             />
             <Tooltip
               cursor={{ stroke: "var(--chart-grid)", strokeWidth: 1 }}
@@ -71,7 +90,8 @@ export default function TrendChart({
                 borderRadius: "12px"
               }}
               labelStyle={{ color: "var(--chart-text)", fontSize: 12 }}
-              formatter={(value) => [Number(value ?? 0).toLocaleString(), "Value"]}
+              labelFormatter={(raw) => (hasDates ? formatShortDate(String(raw)) : String(raw))}
+              formatter={(value) => [formatY(Number(value ?? 0)), "Value"]}
             />
             <Area
               type="monotone"

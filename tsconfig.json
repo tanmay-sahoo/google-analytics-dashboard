@@ -22,10 +22,9 @@
       "react",
       "react-dom"
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
     "plugins": [

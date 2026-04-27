@@ -1,9 +1,15 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
+import Sparkline from "@/components/Sparkline";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import {
+  readDateRangePreference,
+  saveDateRangePreference
+} from "@/lib/date-range-preference";
 import FlashMessage from "@/components/FlashMessage";
 import {
   Area,
@@ -64,6 +70,11 @@ function formatDelta(value: number | null) {
   if (value === null || Number.isNaN(value)) return null;
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function deltaTone(value: number | null): "up" | "down" | "flat" {
+  if (value === null || Number.isNaN(value) || value === 0) return "flat";
+  return value > 0 ? "up" : "down";
 }
 
 function formatDate(value: Date) {
@@ -240,6 +251,27 @@ export default function DashboardClient({
   const [customStart, setCustomStart] = useState(initialRange.start);
   const [customEnd, setCustomEnd] = useState(initialRange.end);
   const [filterError, setFilterError] = useState<string | null>(null);
+  const restoredPreferenceRef = useRef(false);
+
+  useEffect(() => {
+    if (restoredPreferenceRef.current) return;
+    restoredPreferenceRef.current = true;
+    const saved = readDateRangePreference("dashboard");
+    if (!saved) return;
+    setRange(saved.range);
+    if (saved.range === "custom" && saved.start && saved.end) {
+      setCustomStart(saved.start);
+      setCustomEnd(saved.end);
+      void applyRange({
+        rangeOverride: "custom",
+        customStartOverride: saved.start,
+        customEndOverride: saved.end
+      });
+    } else if (saved.range !== "last30") {
+      void applyRange({ rangeOverride: saved.range });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyRange = async ({
     projectIdOverride,
@@ -278,10 +310,15 @@ export default function DashboardClient({
         return;
       }
     } else {
-      const resolved = resolveRange(range);
+      const resolved = resolveRange(effectiveRange);
       start = resolved.start;
       end = resolved.end;
     }
+    saveDateRangePreference("dashboard", {
+      range: effectiveRange,
+      start: effectiveRange === "custom" ? start : undefined,
+      end: effectiveRange === "custom" ? end : undefined
+    });
     const params = new URLSearchParams({
       projectId,
       start,
@@ -336,6 +373,18 @@ export default function DashboardClient({
     conversions: formatDelta(deltaValues?.conversions ?? null),
     revenue: formatDelta(deltaValues?.revenue ?? null)
   };
+  const trendByMetric: Record<MetricKey, number[]> = {
+    sessions: dashboard?.trend.sessions ?? [],
+    users: dashboard?.trend.users ?? [],
+    conversions: dashboard?.trend.conversions ?? [],
+    revenue: dashboard?.trend.revenue ?? []
+  };
+  const deltaToneByMetric: Record<MetricKey, "up" | "down" | "flat"> = {
+    sessions: deltaTone(deltaValues?.sessions ?? null),
+    users: deltaTone(deltaValues?.users ?? null),
+    conversions: deltaTone(deltaValues?.conversions ?? null),
+    revenue: deltaTone(deltaValues?.revenue ?? null)
+  };
 
   return (
     <div className="space-y-8">
@@ -343,7 +392,6 @@ export default function DashboardClient({
         <div>
           <h1 className="page-title">Home</h1>
           <p className="muted">GA4 performance snapshot across the last 30 days.</p>
-          {status === "loading" && <p className="mt-2 text-xs text-slate/50">Loading data...</p>}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {projects.length ? (
@@ -410,11 +458,27 @@ export default function DashboardClient({
         tone="error"
       />
 
+      {status === "loading" ? (
+        <div aria-busy="true" aria-live="polite">
+          <DashboardSkeleton />
+        </div>
+      ) : (
+      <div className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="card space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {metricOptions.map((metric) => {
               const isActive = metric.key === activeMetric;
+              const tone = deltaToneByMetric[metric.key];
+              const trendSeries = trendByMetric[metric.key];
+              const deltaText = deltaLabels[metric.key];
+              const deltaClass =
+                tone === "up"
+                  ? "text-emerald-600"
+                  : tone === "down"
+                  ? "text-rose-600"
+                  : "text-slate/60";
+              const sparkTone = tone === "up" ? "positive" : tone === "down" ? "negative" : "ocean";
               return (
               <button
                 key={metric.key}
@@ -426,16 +490,21 @@ export default function DashboardClient({
                 }`}
                 onClick={() => setActiveMetric(metric.key)}
               >
-                <span className="text-left">
+                <span className="block">
                   <span className="block text-xs uppercase tracking-[0.2em] text-slate/60">
                     {metric.label}
                   </span>
                   <span className="block text-lg font-semibold text-slate">
                     {kpiValues[metric.key]}
                   </span>
-                  {compare && deltaLabels[metric.key] ? (
-                    <span className="mt-1 block text-xs text-slate/50">
-                      {deltaLabels[metric.key]} vs previous
+                  {compare && deltaText ? (
+                    <span className={`mt-1 block text-xs ${deltaClass}`}>
+                      {deltaText} <span className="text-slate/50">vs previous</span>
+                    </span>
+                  ) : null}
+                  {trendSeries.length > 1 ? (
+                    <span className="mt-2 block">
+                      <Sparkline points={trendSeries} tone={sparkTone} height={28} />
                     </span>
                   ) : null}
                 </span>
@@ -597,6 +666,8 @@ export default function DashboardClient({
           ))}
         </div>
       </section>
+      </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import { addDays, formatDateShort } from "@/lib/time";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
+import {
+  readDateRangePreference,
+  saveDateRangePreference
+} from "@/lib/date-range-preference";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -25,7 +29,9 @@ export default function ReportsFilters({
   start,
   end,
   refresh,
-  basePath = "/reports"
+  basePath = "/reports",
+  urlHadRange = true,
+  preferenceScope = "reports"
 }: {
   projects: { id: string; name: string }[];
   selectedProjectId: string;
@@ -35,12 +41,15 @@ export default function ReportsFilters({
   end: string;
   refresh?: string;
   basePath?: string;
+  urlHadRange?: boolean;
+  preferenceScope?: string;
 }) {
   const router = useRouter();
   const [customStart, setCustomStart] = useState(start);
   const [customEnd, setCustomEnd] = useState(end);
   const [selectedRange, setSelectedRange] = useState<RangeKey>(range);
   const [error, setError] = useState<string | null>(null);
+  const restoredPreferenceRef = useRef(false);
 
   function resolveRangeDates(rangeKey: RangeKey, baseEnd: string) {
     const endDate = baseEnd ? new Date(baseEnd) : new Date();
@@ -134,6 +143,11 @@ export default function ReportsFilters({
     } else if (refresh) {
       params.set("refresh", refresh);
     }
+    saveDateRangePreference(preferenceScope, {
+      range: effectiveRange,
+      start: effectiveRange === "custom" ? nextStart : undefined,
+      end: effectiveRange === "custom" ? nextEnd : undefined
+    });
     void prefetchReports({
       projectId: nextProjectId,
       startDate: nextStart,
@@ -142,6 +156,30 @@ export default function ReportsFilters({
     });
     router.push(`${basePath}?${params.toString()}`);
   }
+
+  useEffect(() => {
+    if (restoredPreferenceRef.current) return;
+    restoredPreferenceRef.current = true;
+    if (urlHadRange) return;
+    const saved = readDateRangePreference(preferenceScope);
+    if (!saved) return;
+    if (saved.range === "custom" && saved.start && saved.end) {
+      setSelectedRange("custom");
+      setCustomStart(saved.start);
+      setCustomEnd(saved.end);
+      applyFilters({
+        rangeOverride: "custom",
+        customStartOverride: saved.start,
+        customEndOverride: saved.end
+      });
+      return;
+    }
+    if (saved.range !== range) {
+      setSelectedRange(saved.range);
+      applyFilters({ rangeOverride: saved.range });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleProjectChange(projectId: string) {
     applyFilters({ nextProjectId: projectId });

@@ -9,8 +9,11 @@ import AdsIntelligenceFilters from "@/components/AdsIntelligenceFilters";
 import KPICard from "@/components/KPICard";
 import DualTrendChart from "@/components/DualTrendChart";
 import ReportsDataTable from "@/components/ReportsDataTable";
+import Tabs from "@/components/Tabs";
 
 type RangeKey = "last7" | "last30" | "last90" | "month" | "custom";
+type AdsTabKey = "campaigns" | "products" | "locations" | "keywords";
+const ADS_TAB_KEYS: AdsTabKey[] = ["campaigns", "products", "locations", "keywords"];
 
 function normalizeAdsData(data: AdsIntelligenceData | null): AdsIntelligenceData | null {
   if (!data) return null;
@@ -54,6 +57,7 @@ export default async function AdsPage({
     start?: string;
     end?: string;
     refresh?: string;
+    tab?: AdsTabKey;
   }>;
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -131,6 +135,31 @@ export default async function AdsPage({
   }).toString();
   const detailHref = (key: string) => `/ads/${key}?${filterParams}`;
 
+  const requestedTab = resolvedSearchParams?.tab;
+  const activeTab: AdsTabKey =
+    requestedTab && ADS_TAB_KEYS.includes(requestedTab) ? requestedTab : "campaigns";
+  const tabHref = (tab: AdsTabKey) => {
+    const params = new URLSearchParams(filterParams);
+    params.set("tab", tab);
+    return `/ads?${params.toString()}`;
+  };
+  const tabItems = intelligence
+    ? [
+        { key: "campaigns", label: "Campaigns", count: intelligence.campaigns.length },
+        { key: "products", label: "Products", count: intelligence.products.length },
+        {
+          key: "locations",
+          label: "Locations",
+          count: intelligence.locationCountries.length + intelligence.locationCities.length
+        },
+        {
+          key: "keywords",
+          label: "Keywords",
+          count: intelligence.keywords.length + intelligence.negativeKeywordCandidates.length
+        }
+      ]
+    : [];
+
   return (
     <div className="space-y-6">
       <AdsIntelligenceFilters
@@ -139,6 +168,7 @@ export default async function AdsPage({
         range={rangeKey}
         start={formatDateShort(start)}
         end={formatDateShort(end)}
+        urlHadRange={Boolean(resolvedSearchParams?.range)}
       />
 
       {errorMessage ? <div className="alert">{errorMessage}</div> : null}
@@ -146,15 +176,55 @@ export default async function AdsPage({
       {intelligence ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <KPICard label="Spend" value={formatCurrency(intelligence.summary.spend, currency)} />
-            <KPICard label="Revenue" value={formatCurrency(intelligence.summary.conversionValue, currency)} />
-            <KPICard label="CTR" value={`${intelligence.summary.ctr.toFixed(2)}%`} />
-            <KPICard label="CPC" value={formatCurrency(intelligence.summary.cpc, currency)} />
-            <KPICard label="CPM" value={formatCurrency(intelligence.summary.cpm, currency)} />
-            <KPICard label="CPA" value={formatCurrency(intelligence.summary.cpa, currency)} />
+            <KPICard
+              label="Spend"
+              value={formatCurrency(intelligence.summary.spend, currency)}
+              trend={intelligence.trend.map((row) => row.spend)}
+            />
+            <KPICard
+              label="Revenue"
+              value={formatCurrency(intelligence.summary.conversionValue, currency)}
+              trend={intelligence.trend.map((row) => row.conversionValue)}
+            />
+            <KPICard
+              label="CTR"
+              value={`${intelligence.summary.ctr.toFixed(2)}%`}
+              trend={intelligence.trend.map((row) =>
+                row.impressions > 0 ? (row.clicks / row.impressions) * 100 : 0
+              )}
+            />
+            <KPICard
+              label="CPC"
+              value={formatCurrency(intelligence.summary.cpc, currency)}
+              trend={intelligence.trend.map((row) => (row.clicks > 0 ? row.spend / row.clicks : 0))}
+            />
+            <KPICard
+              label="CPM"
+              value={formatCurrency(intelligence.summary.cpm, currency)}
+              trend={intelligence.trend.map((row) =>
+                row.impressions > 0 ? (row.spend * 1000) / row.impressions : 0
+              )}
+            />
+            <KPICard
+              label="CPA"
+              value={formatCurrency(intelligence.summary.cpa, currency)}
+              trend={intelligence.trend.map((row) =>
+                row.conversions > 0 ? row.spend / row.conversions : 0
+              )}
+            />
             <KPICard label="CAC" value={formatCurrency(intelligence.summary.cac, currency)} />
-            <KPICard label="ROAS" value={`${intelligence.summary.roas.toFixed(2)}x`} />
-            <KPICard label="Conversions" value={formatNumber(intelligence.summary.conversions)} />
+            <KPICard
+              label="ROAS"
+              value={`${intelligence.summary.roas.toFixed(2)}x`}
+              trend={intelligence.trend.map((row) =>
+                row.spend > 0 ? row.conversionValue / row.spend : 0
+              )}
+            />
+            <KPICard
+              label="Conversions"
+              value={formatNumber(intelligence.summary.conversions)}
+              trend={intelligence.trend.map((row) => row.conversions)}
+            />
             <KPICard
               label="Top Country Revenue"
               value={topLocation ? formatCurrency(topLocation.conversionValue, currency) : "--"}
@@ -181,169 +251,205 @@ export default async function AdsPage({
             </div>
           ) : null}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="label">Campaign Details</div>
-              <a className="text-xs text-ocean" href={detailHref("campaigns")}>
-                View all
-              </a>
-            </div>
-            <ReportsDataTable
-              title="Campaign details"
-              dimensionLabel="Campaign"
-              currency={currency}
-              columns={[
-                { label: "Spend", formatType: "currency" },
-                { label: "Revenue", formatType: "currency" },
-                { label: "Clicks" },
-                { label: "Impressions" },
-                { label: "Conversions" },
-                { label: "CPC", formatType: "currency" },
-                { label: "CPA", formatType: "currency" },
-                { label: "ROAS" }
-              ]}
-              rows={intelligence.campaigns.map((row) => ({
-                label: row.label,
-                values: [
-                  row.spend,
-                  row.conversionValue,
-                  row.clicks,
-                  row.impressions,
-                  row.conversions,
-                  row.cpc,
-                  row.cpa,
-                  row.roas
-                ]
-              }))}
+          <div className="space-y-4">
+            <Tabs
+              ariaLabel="Ads breakdowns"
+              items={tabItems}
+              activeKey={activeTab}
+              buildHref={(key) => tabHref(key as AdsTabKey)}
             />
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="label">Product Spend vs Revenue</div>
-              <a className="text-xs text-ocean" href={detailHref("products")}>
-                View all
-              </a>
-            </div>
-            <ReportsDataTable
-              title="Products"
-              dimensionLabel="Product"
-              currency={currency}
-              columns={[
-                { label: "Spend", formatType: "currency" },
-                { label: "Revenue", formatType: "currency" },
-                { label: "Clicks" },
-                { label: "Impressions" },
-                { label: "Conversions" },
-                { label: "ROAS" }
-              ]}
-              rows={intelligence.products.map((row) => ({
-                label: row.label,
-                values: [row.spend, row.conversionValue, row.clicks, row.impressions, row.conversions, row.roas]
-              }))}
-            />
-          </div>
+            {activeTab === "campaigns" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="label">Campaign details</div>
+                  <a className="text-xs text-ocean" href={detailHref("campaigns")}>
+                    View all
+                  </a>
+                </div>
+                <ReportsDataTable
+                  title="Campaign details"
+                  dimensionLabel="Campaign"
+                  currency={currency}
+                  columns={[
+                    { label: "Spend", formatType: "currency" },
+                    { label: "Revenue", formatType: "currency" },
+                    { label: "Clicks" },
+                    { label: "Impressions" },
+                    { label: "Conversions" },
+                    { label: "CPC", formatType: "currency" },
+                    { label: "CPA", formatType: "currency" },
+                    { label: "ROAS" }
+                  ]}
+                  rows={intelligence.campaigns.map((row) => ({
+                    label: row.label,
+                    values: [
+                      row.spend,
+                      row.conversionValue,
+                      row.clicks,
+                      row.impressions,
+                      row.conversions,
+                      row.cpc,
+                      row.cpa,
+                      row.roas
+                    ]
+                  }))}
+                />
+              </div>
+            )}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="label">Country Revenue & Spend</div>
-                <a className="text-xs text-ocean" href={detailHref("locations-country")}>
-                  View all
-                </a>
+            {activeTab === "products" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="label">Product spend vs revenue</div>
+                  <a className="text-xs text-ocean" href={detailHref("products")}>
+                    View all
+                  </a>
+                </div>
+                <ReportsDataTable
+                  title="Products"
+                  dimensionLabel="Product"
+                  currency={currency}
+                  columns={[
+                    { label: "Spend", formatType: "currency" },
+                    { label: "Revenue", formatType: "currency" },
+                    { label: "Clicks" },
+                    { label: "Impressions" },
+                    { label: "Conversions" },
+                    { label: "ROAS" }
+                  ]}
+                  rows={intelligence.products.map((row) => ({
+                    label: row.label,
+                    values: [
+                      row.spend,
+                      row.conversionValue,
+                      row.clicks,
+                      row.impressions,
+                      row.conversions,
+                      row.roas
+                    ]
+                  }))}
+                />
               </div>
-              <ReportsDataTable
-                title="Country performance"
-                dimensionLabel="Country"
-                currency={currency}
-                columns={[
-                  { label: "Revenue", formatType: "currency" },
-                  { label: "Spend", formatType: "currency" },
-                  { label: "Conversions" },
-                  { label: "ROAS" }
-                ]}
-                rows={intelligence.locationCountries.map((row) => ({
-                  label: row.label,
-                  values: [row.conversionValue, row.spend, row.conversions, row.roas]
-                }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="label">City Revenue & Spend</div>
-                <a className="text-xs text-ocean" href={detailHref("locations-city")}>
-                  View all
-                </a>
-              </div>
-              <ReportsDataTable
-                title="City performance"
-                dimensionLabel="City"
-                currency={currency}
-                columns={[
-                  { label: "Revenue", formatType: "currency" },
-                  { label: "Spend", formatType: "currency" },
-                  { label: "Conversions" },
-                  { label: "ROAS" }
-                ]}
-                rows={intelligence.locationCities.map((row) => ({
-                  label: row.label,
-                  values: [row.conversionValue, row.spend, row.conversions, row.roas]
-                }))}
-              />
-            </div>
-          </div>
+            )}
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="label">Top Keywords</div>
-                <a className="text-xs text-ocean" href={detailHref("keywords")}>
-                  View all
-                </a>
+            {activeTab === "locations" && (
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="label">Country revenue &amp; spend</div>
+                    <a className="text-xs text-ocean" href={detailHref("locations-country")}>
+                      View all
+                    </a>
+                  </div>
+                  <ReportsDataTable
+                    title="Country performance"
+                    dimensionLabel="Country"
+                    currency={currency}
+                    columns={[
+                      { label: "Revenue", formatType: "currency" },
+                      { label: "Spend", formatType: "currency" },
+                      { label: "Conversions" },
+                      { label: "ROAS" }
+                    ]}
+                    rows={intelligence.locationCountries.map((row) => ({
+                      label: row.label,
+                      values: [row.conversionValue, row.spend, row.conversions, row.roas]
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="label">City revenue &amp; spend</div>
+                    <a className="text-xs text-ocean" href={detailHref("locations-city")}>
+                      View all
+                    </a>
+                  </div>
+                  <ReportsDataTable
+                    title="City performance"
+                    dimensionLabel="City"
+                    currency={currency}
+                    columns={[
+                      { label: "Revenue", formatType: "currency" },
+                      { label: "Spend", formatType: "currency" },
+                      { label: "Conversions" },
+                      { label: "ROAS" }
+                    ]}
+                    rows={intelligence.locationCities.map((row) => ({
+                      label: row.label,
+                      values: [row.conversionValue, row.spend, row.conversions, row.roas]
+                    }))}
+                  />
+                </div>
               </div>
-              <ReportsDataTable
-                title="Top keywords"
-                dimensionLabel="Keyword"
-                currency={currency}
-                columns={[
-                  { label: "Spend", formatType: "currency" },
-                  { label: "Revenue", formatType: "currency" },
-                  { label: "Clicks" },
-                  { label: "Conversions" },
-                  { label: "CPA", formatType: "currency" },
-                  { label: "ROAS" }
-                ]}
-                rows={intelligence.keywords.map((row) => ({
-                  label: row.label,
-                  values: [row.spend, row.conversionValue, row.clicks, row.conversions, row.cpa, row.roas]
-                }))}
-              />
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="label">Negative Keyword Candidates</div>
-                <a className="text-xs text-ocean" href={detailHref("negative-keywords")}>
-                  View all
-                </a>
+            {activeTab === "keywords" && (
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="label">Top keywords</div>
+                    <a className="text-xs text-ocean" href={detailHref("keywords")}>
+                      View all
+                    </a>
+                  </div>
+                  <ReportsDataTable
+                    title="Top keywords"
+                    dimensionLabel="Keyword"
+                    currency={currency}
+                    columns={[
+                      { label: "Spend", formatType: "currency" },
+                      { label: "Revenue", formatType: "currency" },
+                      { label: "Clicks" },
+                      { label: "Conversions" },
+                      { label: "CPA", formatType: "currency" },
+                      { label: "ROAS" }
+                    ]}
+                    rows={intelligence.keywords.map((row) => ({
+                      label: row.label,
+                      values: [
+                        row.spend,
+                        row.conversionValue,
+                        row.clicks,
+                        row.conversions,
+                        row.cpa,
+                        row.roas
+                      ]
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="label">Negative keyword candidates</div>
+                    <a className="text-xs text-ocean" href={detailHref("negative-keywords")}>
+                      View all
+                    </a>
+                  </div>
+                  <ReportsDataTable
+                    title="Negative keyword candidates"
+                    dimensionLabel="Search term"
+                    currency={currency}
+                    columns={[
+                      { label: "Spend", formatType: "currency" },
+                      { label: "Clicks" },
+                      { label: "Impressions" },
+                      { label: "Conversions" },
+                      { label: "Revenue", formatType: "currency" }
+                    ]}
+                    rows={intelligence.negativeKeywordCandidates.map((row) => ({
+                      label: row.label,
+                      values: [
+                        row.spend,
+                        row.clicks,
+                        row.impressions,
+                        row.conversions,
+                        row.conversionValue
+                      ]
+                    }))}
+                  />
+                </div>
               </div>
-              <ReportsDataTable
-                title="Negative keyword candidates"
-                dimensionLabel="Search term"
-                currency={currency}
-                columns={[
-                  { label: "Spend", formatType: "currency" },
-                  { label: "Clicks" },
-                  { label: "Impressions" },
-                  { label: "Conversions" },
-                  { label: "Revenue", formatType: "currency" }
-                ]}
-                rows={intelligence.negativeKeywordCandidates.map((row) => ({
-                  label: row.label,
-                  values: [row.spend, row.clicks, row.impressions, row.conversions, row.conversionValue]
-                }))}
-              />
-            </div>
+            )}
           </div>
         </>
       ) : null}

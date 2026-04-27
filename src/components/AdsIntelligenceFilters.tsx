@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
 import { addDays, formatDateShort } from "@/lib/time";
+import {
+  readDateRangePreference,
+  saveDateRangePreference
+} from "@/lib/date-range-preference";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -41,7 +45,9 @@ export default function AdsIntelligenceFilters({
   range,
   start,
   end,
-  basePath = "/ads"
+  basePath = "/ads",
+  urlHadRange = true,
+  preferenceScope = "ads"
 }: {
   projects: { id: string; name: string }[];
   selectedProjectId: string;
@@ -49,12 +55,15 @@ export default function AdsIntelligenceFilters({
   start: string;
   end: string;
   basePath?: string;
+  urlHadRange?: boolean;
+  preferenceScope?: string;
 }) {
   const router = useRouter();
   const [selectedRange, setSelectedRange] = useState<RangeKey>(range);
   const [customStart, setCustomStart] = useState(start);
   const [customEnd, setCustomEnd] = useState(end);
   const [error, setError] = useState<string | null>(null);
+  const restoredPreferenceRef = useRef(false);
 
   function pushFilters({
     projectId,
@@ -67,6 +76,11 @@ export default function AdsIntelligenceFilters({
     startDate: string;
     endDate: string;
   }) {
+    saveDateRangePreference(preferenceScope, {
+      range: rangeKey,
+      start: rangeKey === "custom" ? startDate : undefined,
+      end: rangeKey === "custom" ? endDate : undefined
+    });
     const params = new URLSearchParams({
       projectId,
       range: rangeKey,
@@ -109,6 +123,26 @@ export default function AdsIntelligenceFilters({
       endDate: resolved.end
     });
   }
+
+  useEffect(() => {
+    if (restoredPreferenceRef.current) return;
+    restoredPreferenceRef.current = true;
+    if (urlHadRange) return;
+    const saved = readDateRangePreference(preferenceScope);
+    if (!saved) return;
+    if (saved.range === "custom" && saved.start && saved.end) {
+      setSelectedRange("custom");
+      setCustomStart(saved.start);
+      setCustomEnd(saved.end);
+      apply({ rangeKey: "custom", startDate: saved.start, endDate: saved.end });
+      return;
+    }
+    if (saved.range !== range) {
+      setSelectedRange(saved.range);
+      apply({ rangeKey: saved.range });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-3">

@@ -4,6 +4,10 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatDateShort } from "@/lib/time";
 import ProjectDetailClient from "@/components/ProjectDetailClient";
+import Tabs from "@/components/Tabs";
+
+type ProjectDetailTab = "storage" | "rows" | "ingestion" | "activity";
+const PROJECT_DETAIL_TABS: ProjectDetailTab[] = ["storage", "rows", "ingestion", "activity"];
 
 function formatDateTime(value: Date | null | undefined) {
   if (!value) return "-";
@@ -38,11 +42,14 @@ function summarizeMetadata(value: unknown) {
 }
 
 export default async function ProjectDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 }) {
   const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
@@ -124,6 +131,18 @@ export default async function ProjectDetailPage({
     })
   ]);
 
+  const requestedTab = resolvedSearchParams?.tab as ProjectDetailTab | undefined;
+  const activeTab: ProjectDetailTab =
+    requestedTab && PROJECT_DETAIL_TABS.includes(requestedTab) ? requestedTab : "storage";
+  const tabHref = (key: string) => `/projects/${project.id}?tab=${key}`;
+  const totalStoredRows = ga4Metrics.reduce((acc, item) => acc + item._count._all, 0);
+  const tabItems = [
+    { key: "storage", label: "Storage summary", count: totalStoredRows },
+    { key: "rows", label: "Fetched rows", count: adsMetrics.length },
+    { key: "ingestion", label: "Ingestion logs", count: ingestionLogs.length },
+    { key: "activity", label: "API activity", count: activityLogs.length }
+  ];
+
   return (
     <div className="space-y-8">
       <div>
@@ -141,154 +160,171 @@ export default async function ProjectDetailPage({
         role={user.role}
       />
 
-      <div className="card space-y-4">
-        <div>
-          <div className="label">Source storage summary</div>
-          <p className="text-sm text-slate/60">Latest stored rows per source from your database.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th>Total rows</th>
-                <th>Last metric date</th>
-                <th>Last fetched at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ga4Metrics.length ? (
-                ga4Metrics.map((item) => (
-                  <tr key={item.source} className="border-t border-slate-100">
-                    <td>{item.source}</td>
-                    <td>{item._count._all}</td>
-                    <td>{item._max.date ? formatDateShort(item._max.date) : "-"}</td>
-                    <td>{formatDateTime(item._max.createdAt)}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr className="border-t border-slate-100">
-                  <td colSpan={4}>No metric rows saved yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <div className="space-y-4">
+        <Tabs
+          ariaLabel="Project data tables"
+          items={tabItems}
+          activeKey={activeTab}
+          buildHref={tabHref}
+        />
 
-      <div className="card space-y-4">
-        <div>
-          <div className="label">Latest fetched data rows</div>
-          <p className="text-sm text-slate/60">Recent per-day metric rows persisted for this project.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Source</th>
-                <th>Metric date</th>
-                <th>Fetched at</th>
-                <th>Fetched fields</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adsMetrics.length ? (
-                adsMetrics.map((row) => (
-                  <tr key={row.id} className="border-t border-slate-100">
-                    <td>{row.source}</td>
-                    <td>{formatDateShort(row.date)}</td>
-                    <td>{formatDateTime(row.createdAt)}</td>
-                    <td>{summarizeJson(row.metrics, 6)}</td>
+        {activeTab === "storage" && (
+          <div className="card space-y-4">
+            <div>
+              <div className="label">Source storage summary</div>
+              <p className="text-sm text-slate/60">Latest stored rows per source from your database.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Total rows</th>
+                    <th>Last metric date</th>
+                    <th>Last fetched at</th>
                   </tr>
-                ))
-              ) : (
-                <tr className="border-t border-slate-100">
-                  <td colSpan={4}>No fetched metric rows yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {ga4Metrics.length ? (
+                    ga4Metrics.map((item) => (
+                      <tr key={item.source} className="border-t border-slate-100">
+                        <td>{item.source}</td>
+                        <td>{item._count._all}</td>
+                        <td>{item._max.date ? formatDateShort(item._max.date) : "-"}</td>
+                        <td>{formatDateTime(item._max.createdAt)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={4}>No metric rows saved yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-      <div className="card space-y-4">
-        <div>
-          <div className="label">Ingestion fetch logs</div>
-          <p className="text-sm text-slate/60">Scheduled/cron ingestion history for this project.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Run started</th>
-                <th>Run status</th>
-                <th>Project fetch started</th>
-                <th>Project fetch finished</th>
-                <th>GA4 rows</th>
-                <th>Ads rows</th>
-                <th>Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ingestionLogs.length ? (
-                ingestionLogs.map((log) => (
-                  <tr key={log.id} className="border-t border-slate-100">
-                    <td>{formatDateTime(log.run.startedAt)}</td>
-                    <td>{log.run.status}</td>
-                    <td>{formatDateTime(log.startedAt)}</td>
-                    <td>{formatDateTime(log.finishedAt)}</td>
-                    <td>{log.ga4Inserted}</td>
-                    <td>{log.adsInserted}</td>
-                    <td>{log.error ?? log.run.error ?? "-"}</td>
+        {activeTab === "rows" && (
+          <div className="card space-y-4">
+            <div>
+              <div className="label">Latest fetched data rows</div>
+              <p className="text-sm text-slate/60">Recent per-day metric rows persisted for this project.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Metric date</th>
+                    <th>Fetched at</th>
+                    <th>Fetched fields</th>
                   </tr>
-                ))
-              ) : (
-                <tr className="border-t border-slate-100">
-                  <td colSpan={7}>No ingestion logs yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {adsMetrics.length ? (
+                    adsMetrics.map((row) => (
+                      <tr key={row.id} className="border-t border-slate-100">
+                        <td>{row.source}</td>
+                        <td>{formatDateShort(row.date)}</td>
+                        <td>{formatDateTime(row.createdAt)}</td>
+                        <td>{summarizeJson(row.metrics, 6)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={4}>No fetched metric rows yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-      <div className="card space-y-4">
-        <div>
-          <div className="label">API activity logs</div>
-          <p className="text-sm text-slate/60">Manual/source API actions with fetched metadata snapshots.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Message</th>
-                <th>Metadata</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activityLogs.length ? (
-                activityLogs.map((log) => (
-                  <tr key={log.id} className="border-t border-slate-100">
-                    <td>{formatDateTime(log.createdAt)}</td>
-                    <td>{log.user?.name ?? log.user?.email ?? "System"}</td>
-                    <td>{log.action}</td>
-                    <td>{log.entityType}</td>
-                    <td>{log.message ?? "-"}</td>
-                    <td>{summarizeMetadata(log.metadata)}</td>
+        {activeTab === "ingestion" && (
+          <div className="card space-y-4">
+            <div>
+              <div className="label">Ingestion fetch logs</div>
+              <p className="text-sm text-slate/60">Scheduled/cron ingestion history for this project.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Run started</th>
+                    <th>Run status</th>
+                    <th>Project fetch started</th>
+                    <th>Project fetch finished</th>
+                    <th>GA4 rows</th>
+                    <th>Ads rows</th>
+                    <th>Error</th>
                   </tr>
-                ))
-              ) : (
-                <tr className="border-t border-slate-100">
-                  <td colSpan={6}>No API activity logs yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {ingestionLogs.length ? (
+                    ingestionLogs.map((log) => (
+                      <tr key={log.id} className="border-t border-slate-100">
+                        <td>{formatDateTime(log.run.startedAt)}</td>
+                        <td>{log.run.status}</td>
+                        <td>{formatDateTime(log.startedAt)}</td>
+                        <td>{formatDateTime(log.finishedAt)}</td>
+                        <td>{log.ga4Inserted}</td>
+                        <td>{log.adsInserted}</td>
+                        <td>{log.error ?? log.run.error ?? "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={7}>No ingestion logs yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "activity" && (
+          <div className="card space-y-4">
+            <div>
+              <div className="label">API activity logs</div>
+              <p className="text-sm text-slate/60">Manual/source API actions with fetched metadata snapshots.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Message</th>
+                    <th>Metadata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activityLogs.length ? (
+                    activityLogs.map((log) => (
+                      <tr key={log.id} className="border-t border-slate-100">
+                        <td>{formatDateTime(log.createdAt)}</td>
+                        <td>{log.user?.name ?? log.user?.email ?? "System"}</td>
+                        <td>{log.action}</td>
+                        <td>{log.entityType}</td>
+                        <td>{log.message ?? "-"}</td>
+                        <td>{summarizeMetadata(log.metadata)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-slate-100">
+                      <td colSpan={6}>No API activity logs yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
