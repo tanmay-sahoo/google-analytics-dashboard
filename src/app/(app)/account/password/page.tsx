@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import FlashMessage from "@/components/FlashMessage";
 
 export default function ChangePasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -52,8 +53,8 @@ export default function ChangePasswordPage() {
           <span>New password</span>
           <input name="newPassword" type="password" className="input" required />
         </label>
-        {error ? <div className="text-sm text-red-600">{error}</div> : null}
-        {message ? <div className="text-sm text-emerald-700">{message}</div> : null}
+        <FlashMessage message={error} tone="error" onDismiss={() => setError(null)} />
+        <FlashMessage message={message} tone="success" onDismiss={() => setMessage(null)} />
         <button className="btn-primary" disabled={loading}>
           {loading ? "Updating..." : "Update password"}
         </button>

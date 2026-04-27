@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { t } from "@/lib/i18n";
+import FlashMessage from "@/components/FlashMessage";
 
 const LANG_KEY = "mdh_lang";
 
@@ -85,7 +86,6 @@ export default function SidebarUserMenu({
       event.currentTarget?.reset();
       setShowPasswordModal(false);
       setToast("Password changed successfully.");
-      setTimeout(() => setToast(null), 3000);
     } else {
       const data = await response.json().catch(() => ({}));
       setPwError(data.error ?? "Failed to update password.");
@@ -182,8 +182,8 @@ export default function SidebarUserMenu({
                 <span>Re-enter new password</span>
                 <input name="confirmPassword" type="password" className="input" required />
               </label>
-              {pwError ? <div className="text-sm text-red-600">{pwError}</div> : null}
-              {pwMessage ? <div className="text-sm text-emerald-700">{pwMessage}</div> : null}
+              <FlashMessage message={pwError} tone="error" onDismiss={() => setPwError(null)} />
+              <FlashMessage message={pwMessage} tone="success" onDismiss={() => setPwMessage(null)} />
               <button className="btn-primary" disabled={pwLoading}>
                 {pwLoading ? "Updating..." : "Update password"}
               </button>
@@ -192,11 +192,9 @@ export default function SidebarUserMenu({
         </div>
       ) : null}
 
-      {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-lg">
-          {toast}
-        </div>
-      ) : null}
+      <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm px-4">
+        <FlashMessage message={toast} tone="success" onDismiss={() => setToast(null)} />
+      </div>
     </div>
   );
 }

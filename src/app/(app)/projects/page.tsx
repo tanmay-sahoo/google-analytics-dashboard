@@ -20,7 +20,7 @@ export default async function ProjectsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="page-title">Projects</h1>
-        <p className="text-sm text-slate/60">Open a project to configure data sources and metrics.</p>
+        <p className="text-sm text-slate/60">Open a project to manage data source connections and fetch logs.</p>
       </div>
       <ProjectsListClient projects={projects} canDelete={user.role === "ADMIN"} />
     </div>

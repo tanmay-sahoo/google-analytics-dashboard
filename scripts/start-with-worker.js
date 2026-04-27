@@ -1,9 +1,12 @@
 const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
-function run(command, args, name) {
+function run(command, args, name, extraEnv = {}) {
   const child = spawn(command, args, {
     stdio: "inherit",
-    shell: true
+    shell: true,
+    env: { ...process.env, ...extraEnv }
   });
 
   child.on("exit", (code) => {
@@ -16,7 +19,18 @@ function run(command, args, name) {
 }
 
 const isDev = process.argv.includes("--dev");
-const app = run("next", [isDev ? "dev" : "start"], "app");
+const distDir = isDev ? ".next-dev" : ".next";
+if (isDev && process.env.CLEAN_NEXT_DEV_CACHE !== "0") {
+  const devDir = path.join(process.cwd(), distDir);
+  try {
+    fs.rmSync(devDir, { recursive: true, force: true });
+  } catch (error) {
+    // Ignore cache cleanup failures; Next can still start.
+  }
+}
+const app = run("next", [isDev ? "dev" : "start"], "app", {
+  NEXT_DIST_DIR: distDir
+});
 const worker = run("node", ["scripts/ingestion-worker.js"], "worker");
 
 const shutdown = () => {

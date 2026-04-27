@@ -95,13 +95,13 @@ export async function GET(request: Request) {
     realtime = { activeUsers: 0, countries: [] };
   }
 
-  let highlights = {
+  let highlights: Awaited<ReturnType<typeof fetchGa4Highlights>> = {
     events: [],
     sources: [],
     landingPages: [],
     userAcquisition: [],
     sessionAcquisition: [],
-    countries: [] as { label: string; value: number }[]
+    countries: []
   };
   try {
     highlights = await fetchGa4Highlights({

@@ -42,13 +42,13 @@ export async function GET(request: Request) {
   const analyticsData = google.analyticsdata({ version: "v1beta", auth: authClient });
 
   const response = await analyticsData.properties.runReport({
-    property: `properties/${ga4Source.externalId}`,
+    property: `properties/${String(ga4Source.externalId)}`,
     requestBody: {
       dateRanges: [{ startDate, endDate }],
       metrics: [{ name: "itemsViewed" }],
       dimensions: [{ name: "itemName" }],
       orderBys: [{ desc: true, metric: { metricName: "itemsViewed" } }],
-      limit: 50
+      limit: "50"
     }
   });
 

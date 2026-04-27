@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export async function logActivity({
   userId,
@@ -13,7 +14,7 @@ export async function logActivity({
   entityType: string;
   entityId?: string | null;
   message?: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Prisma.InputJsonValue | null;
 }) {
   try {
     await prisma.activityLog.create({

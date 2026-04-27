@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type AiConfig = {
   id: string;
@@ -35,6 +36,7 @@ export default function AdminAiSettingsClient() {
   }, []);
 
   const defaultConfig = useMemo(() => configs.find((item) => item.isDefault) ?? null, [configs]);
+  const messageTone = inferTone(message);
 
   async function loadConfigs() {
     setLoading(true);
@@ -138,7 +140,7 @@ export default function AdminAiSettingsClient() {
         </button>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
       {loading ? <div className="text-sm text-slate/60">Loading...</div> : null}
 
       {configs.length === 0 && !loading ? (

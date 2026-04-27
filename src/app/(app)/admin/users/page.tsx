@@ -25,7 +25,15 @@ export default async function AdminUsersPage() {
     }
   });
 
+  const normalizedUsers = users.map((userRow) => ({
+    ...userRow,
+    menuAccess: Array.isArray(userRow.menuAccess)
+      ? userRow.menuAccess.filter((item): item is string => typeof item === "string")
+      : null,
+    createdAt: userRow.createdAt.toISOString()
+  }));
+
   return (
-    <AdminUsersClient initialUsers={users} />
+    <AdminUsersClient initialUsers={normalizedUsers} />
   );
 }

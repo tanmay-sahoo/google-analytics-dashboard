@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 function isSameDay(left: Date, right: Date) {
   return left.toISOString().slice(0, 10) === right.toISOString().slice(0, 10);
@@ -45,6 +46,7 @@ export async function getOrRefreshReport<T>({
   }
 
   const data = await fetcher();
+  const jsonData = JSON.parse(JSON.stringify(data)) as Prisma.InputJsonValue;
   await prisma.reportCache.upsert({
     where: {
       projectId_reportKey_rangeStart_rangeEnd: {
@@ -54,13 +56,13 @@ export async function getOrRefreshReport<T>({
         rangeEnd: normalizedEnd
       }
     },
-    update: { data },
+    update: { data: jsonData },
     create: {
       projectId,
       reportKey,
       rangeStart: normalizedStart,
       rangeEnd: normalizedEnd,
-      data
+      data: jsonData
     }
   });
 

@@ -7,6 +7,8 @@ export type AdsDailyMetrics = {
   spend: number;
   clicks: number;
   impressions: number;
+  conversions: number;
+  conversionValue: number;
   roas: number;
 };
 
@@ -49,6 +51,7 @@ export async function fetchAdsDailyMetrics({
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
+      metrics.conversions,
       metrics.conversions_value
     FROM customer
     WHERE segments.date BETWEEN '${formatDateShort(start)}' AND '${formatDateShort(end)}'
@@ -62,6 +65,7 @@ export async function fetchAdsDailyMetrics({
   return rows.map((row: any) => {
     const date = new Date(row.segments.date);
     const spend = Number(row.metrics.cost_micros ?? 0) / 1_000_000;
+    const conversions = Number(row.metrics.conversions ?? 0);
     const revenue = Number(row.metrics.conversions_value ?? 0);
     const roas = spend > 0 ? Number((revenue / spend).toFixed(2)) : 0;
 
@@ -70,6 +74,8 @@ export async function fetchAdsDailyMetrics({
       spend,
       clicks: Number(row.metrics.clicks ?? 0),
       impressions: Number(row.metrics.impressions ?? 0),
+      conversions,
+      conversionValue: revenue,
       roas
     };
   });

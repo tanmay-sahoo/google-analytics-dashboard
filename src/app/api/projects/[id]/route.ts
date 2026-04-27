@@ -10,14 +10,15 @@ const updateSchema = z.object({
   currency: z.string().min(2).optional()
 });
 
-export async function GET(_: Request, context: { params: { id: string } }) {
+export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const project = await prisma.project.findUnique({
-    where: { id: context.params.id },
+    where: { id },
     include: { dataSources: true }
   });
 
@@ -37,7 +38,8 @@ export async function GET(_: Request, context: { params: { id: string } }) {
   return NextResponse.json({ project });
 }
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -50,7 +52,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
   }
 
   const project = await prisma.project.update({
-    where: { id: context.params.id },
+    where: { id },
     data: parsed.data
   });
 
@@ -66,13 +68,14 @@ export async function PUT(request: Request, context: { params: { id: string } })
   return NextResponse.json({ id: project.id });
 }
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const project = await prisma.project.delete({ where: { id: context.params.id } });
+  const project = await prisma.project.delete({ where: { id } });
   await logActivity({
     userId: user.id,
     action: "DELETE",

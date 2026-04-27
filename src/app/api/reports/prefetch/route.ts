@@ -132,7 +132,7 @@ export async function POST(request: Request) {
               refreshToken: ga4Integration.refreshToken!,
               dimension: report.dimension,
               metric: report.metric,
-              order: report.order ?? "desc",
+              order: ("order" in report ? report.order : undefined) ?? "desc",
               startDate,
               endDate,
               limit: 100

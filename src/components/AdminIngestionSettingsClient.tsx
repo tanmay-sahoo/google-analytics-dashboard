@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type IngestionSettings = {
   enabled: boolean;
@@ -36,6 +37,7 @@ export default function AdminIngestionSettingsClient({
     const next = new Date(new Date(lastRunAt).getTime() + intervalMins * 60 * 1000);
     return formatUtcDate(next);
   }, [enabled, lastRunAt, intervalMins]);
+  const messageTone = inferTone(message);
 
   async function saveSettings() {
     setSaving(true);
@@ -77,7 +79,7 @@ export default function AdminIngestionSettingsClient({
 
   return (
     <div className="card space-y-6">
-      {message ? <div className="alert">{message}</div> : null}
+      <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex items-center justify-between rounded-xl border border-slate/10 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/60">
           <span className="text-slate/70 dark:text-slate-200">Enable automatic ingestion</span>

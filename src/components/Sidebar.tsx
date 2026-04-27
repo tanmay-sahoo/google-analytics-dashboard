@@ -11,6 +11,7 @@ import {
   Plug,
   Settings,
   ListChecks,
+  BarChart3,
   ChevronDown,
   ChevronRight,
   PanelLeftClose,
@@ -54,7 +55,7 @@ export function SidebarContent({
 
   const isPathActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const projectSectionActive =
-    isPathActive("/projects") || isPathActive("/reports") || isPathActive("/merchant");
+    isPathActive("/projects") || isPathActive("/reports") || isPathActive("/merchant") || isPathActive("/ads");
 
   return (
     <>
@@ -148,6 +149,18 @@ export function SidebarContent({
                       }`}
                     >
                       {t(locale, "merchant")}
+                    </Link>
+                    <Link
+                      href="/ads"
+                      onClick={onNavigate}
+                      className={`ml-9 flex items-center rounded-lg px-3 py-1.5 text-xs transition ${
+                        isPathActive("/ads")
+                          ? "bg-slate/10 text-slate"
+                          : "text-slate/60 hover:bg-slate/5 hover:text-slate/80"
+                      }`}
+                    >
+                      <BarChart3 size={14} className="mr-2" />
+                      {t(locale, "adsIntelligence")}
                     </Link>
                   </>
                 ) : null}

@@ -2,19 +2,47 @@ import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatCurrency, formatNumber } from "@/lib/format";
-import { addDays, formatDateShort } from "@/lib/time";
-import TrendChart from "@/components/TrendChart";
-import Table from "@/components/Table";
+import { formatDateShort } from "@/lib/time";
 import ProjectDetailClient from "@/components/ProjectDetailClient";
-import { fetchGa4Breakdowns, fetchGa4ProjectReports } from "@/lib/ga4";
-import { getOrRefreshReport } from "@/lib/report-cache";
+
+function formatDateTime(value: Date | null | undefined) {
+  if (!value) return "-";
+  return `${value.toISOString().slice(0, 19).replace("T", " ")} UTC`;
+}
+
+function metricValueToText(value: unknown) {
+  if (typeof value === "number") {
+    if (Number.isInteger(value)) return value.toLocaleString();
+    return value.toFixed(2);
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value === null || value === undefined) return "-";
+  return JSON.stringify(value);
+}
+
+function summarizeJson(value: unknown, limit = 4) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "-";
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return "-";
+  return entries
+    .slice(0, limit)
+    .map(([key, current]) => `${key}: ${metricValueToText(current)}`)
+    .join(" | ");
+}
+
+function summarizeMetadata(value: unknown) {
+  if (!value) return "-";
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return text.length > 220 ? `${text.slice(0, 220)}...` : text;
+}
 
 export default async function ProjectDetailPage({
   params
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const resolvedParams = await params;
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
@@ -23,7 +51,7 @@ export default async function ProjectDetailPage({
   }
 
   const project = await prisma.project.findUnique({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
     include: { dataSources: true }
   });
 
@@ -41,20 +69,18 @@ export default async function ProjectDetailPage({
   }
 
   const [ga4Metrics, adsMetrics] = await Promise.all([
-    prisma.metricDaily.findMany({
-      where: { projectId: project.id, source: "GA4" },
-      orderBy: { date: "asc" },
-      take: 30
+    prisma.metricDaily.groupBy({
+      by: ["source"],
+      where: { projectId: project.id },
+      _count: { _all: true },
+      _max: { date: true, createdAt: true }
     }),
     prisma.metricDaily.findMany({
-      where: { projectId: project.id, source: "ADS" },
-      orderBy: { date: "asc" },
-      take: 30
+      where: { projectId: project.id },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 40
     })
   ]);
-
-  const ga4Sessions = ga4Metrics.map((item) => Number((item.metrics as any).sessions ?? 0));
-  const adsSpend = adsMetrics.map((item) => Number((item.metrics as any).spend ?? 0));
 
   const ga4Source = project.dataSources.find((item) => item.type === "GA4");
   const adsSource = project.dataSources.find((item) => item.type === "ADS");
@@ -70,90 +96,39 @@ export default async function ProjectDetailPage({
     new Set(assignedMerchants.map((item) => item.externalId).filter(Boolean))
   );
 
-  const ga4Integration = await prisma.integrationSetting.findUnique({ where: { type: "GA4" } });
-  let campaigns: Array<[string, string, string]> = [];
-  let sources: Array<[string, string, string]> = [];
-  let devices: Array<[string, string, string]> = [];
-  let reports: Awaited<ReturnType<typeof fetchGa4ProjectReports>> | null = null;
-  let reportsError: string | null = null;
-  const reportEnd = new Date();
-  reportEnd.setHours(0, 0, 0, 0);
-  const reportStart = addDays(reportEnd, -29);
-
-  function formatRate(value: number) {
-    return `${(value * 100).toFixed(1)}%`;
-  }
-
-  function formatDuration(seconds: number) {
-    const total = Math.round(seconds);
-    const minutes = Math.floor(total / 60);
-    const remaining = total % 60;
-    return `${minutes}m ${String(remaining).padStart(2, "0")}s`;
-  }
-
-  if (ga4Integration?.refreshToken && ga4Id) {
-    try {
-      const [breakdowns, snapshot] = await Promise.all([
-        getOrRefreshReport({
-          projectId: project.id,
-          reportKey: "project-breakdowns:v1",
-          rangeStart: reportStart,
-          rangeEnd: reportEnd,
-          fetcher: () =>
-            fetchGa4Breakdowns({
-              propertyId: ga4Id,
-              refreshToken: ga4Integration.refreshToken!
-            })
-        }),
-        getOrRefreshReport({
-          projectId: project.id,
-          reportKey: "snapshot",
-          rangeStart: reportStart,
-          rangeEnd: reportEnd,
-          fetcher: () =>
-            fetchGa4ProjectReports({
-              propertyId: ga4Id,
-              refreshToken: ga4Integration.refreshToken!,
-              startDate: formatDateShort(reportStart),
-              endDate: formatDateShort(reportEnd)
-            })
-        })
-      ]);
-
-      campaigns = breakdowns.campaigns.map((row) => [
-        row.label,
-        formatNumber(row.sessions),
-        formatCurrency(row.revenue, project.currency)
-      ]);
-      sources = breakdowns.sources.map((row) => [
-        row.label,
-        formatNumber(row.sessions),
-        `${row.conversions.toFixed(0)}`
-      ]);
-      devices = breakdowns.devices.map((row) => [
-        row.label,
-        formatNumber(row.users),
-        formatNumber(row.sessions)
-      ]);
-      reports = snapshot;
-    } catch (error) {
-      campaigns = [];
-      sources = [];
-      devices = [];
-      reports = null;
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("GA4 reports fetch failed:", message);
-      reportsError = `Failed to fetch GA4 reports. ${message}`;
-    }
-  }
+  const [ingestionLogs, activityLogs] = await Promise.all([
+    prisma.ingestionProjectLog.findMany({
+      where: { projectId: project.id },
+      orderBy: { startedAt: "desc" },
+      take: 40,
+      include: {
+        run: {
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            finishedAt: true,
+            error: true
+          }
+        }
+      }
+    }),
+    prisma.activityLog.findMany({
+      where: {
+        entityId: project.id,
+        entityType: { in: ["METRICS", "DATASOURCE"] }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+      include: { user: { select: { id: true, name: true, email: true } } }
+    })
+  ]);
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="page-title">{project.name}</h1>
-        <p className="text-sm text-slate/60">
-          {project.timezone} - {project.currency} - Last synced {ga4Metrics.at(-1)?.date ? formatDateShort(ga4Metrics.at(-1)!.date) : "--"}
-        </p>
+        <p className="text-sm text-slate/60">{project.timezone} - {project.currency}</p>
       </div>
 
       <ProjectDetailClient
@@ -166,161 +141,155 @@ export default async function ProjectDetailPage({
         role={user.role}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <TrendChart points={ga4Sessions} label="Sessions (30 days)" />
-        <TrendChart points={adsSpend} label="Spend (30 days)" />
+      <div className="card space-y-4">
+        <div>
+          <div className="label">Source storage summary</div>
+          <p className="text-sm text-slate/60">Latest stored rows per source from your database.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Total rows</th>
+                <th>Last metric date</th>
+                <th>Last fetched at</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ga4Metrics.length ? (
+                ga4Metrics.map((item) => (
+                  <tr key={item.source} className="border-t border-slate-100">
+                    <td>{item.source}</td>
+                    <td>{item._count._all}</td>
+                    <td>{item._max.date ? formatDateShort(item._max.date) : "-"}</td>
+                    <td>{formatDateTime(item._max.createdAt)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-slate-100">
+                  <td colSpan={4}>No metric rows saved yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {reports ? (
-        <div className="space-y-6">
-          <div className="section-header">
-            <div>
-              <h2 className="text-lg font-semibold">Reports snapshot</h2>
-              <p className="text-sm text-slate/60">
-                {formatDateShort(reportStart)} - {formatDateShort(reportEnd)}
-              </p>
-            </div>
-            <a className="btn-outline" href={`/api/projects/${project.id}/reports/export`}>
-              Export CSV
-            </a>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card">
-              <div className="label">Active users</div>
-              <div className="kpi">{formatNumber(reports.summary.activeUsers)}</div>
-            </div>
-            <div className="card">
-              <div className="label">New users</div>
-              <div className="kpi">{formatNumber(reports.summary.newUsers)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Returning users</div>
-              <div className="kpi">{formatNumber(reports.summary.returningUsers)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Sessions</div>
-              <div className="kpi">{formatNumber(reports.summary.sessions)}</div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Table
-              headers={["User acquisition", "New users"]}
-              rows={
-                reports.acquisitionUsers.length
-                  ? reports.acquisitionUsers.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-            <Table
-              headers={["Traffic acquisition", "Sessions"]}
-              rows={
-                reports.acquisitionSessions.length
-                  ? reports.acquisitionSessions.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card">
-              <div className="label">Engagement rate</div>
-              <div className="kpi">{formatRate(reports.engagement.engagementRate)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Bounce rate</div>
-              <div className="kpi">{formatRate(reports.engagement.bounceRate)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Avg session duration</div>
-              <div className="kpi">{formatDuration(reports.engagement.averageSessionDuration)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Sessions per user</div>
-              <div className="kpi">{reports.engagement.sessionsPerUser.toFixed(2)}</div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Table
-              headers={["Top events", "Event count"]}
-              rows={
-                reports.topEvents.length
-                  ? reports.topEvents.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-            <Table
-              headers={["Top pages", "Views"]}
-              rows={
-                reports.topPages.length
-                  ? reports.topPages.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Table
-              headers={["Least visited pages", "Views"]}
-              rows={
-                reports.leastPages.length
-                  ? reports.leastPages.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-            <Table
-              headers={["Search terms", "Sessions"]}
-              rows={
-                reports.searchTerms.length
-                  ? reports.searchTerms.map((row) => [row.label, formatNumber(row.value)])
-                  : [["No data", "-"]]
-              }
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="card">
-              <div className="label">Total revenue</div>
-              <div className="kpi">{formatCurrency(reports.summary.totalRevenue, project.currency)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Conversions</div>
-              <div className="kpi">{formatNumber(reports.summary.conversions)}</div>
-            </div>
-            <div className="card">
-              <div className="label">Page views</div>
-              <div className="kpi">{formatNumber(reports.engagement.pageViews)}</div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <TrendChart points={reports.retention.newUsers} label="New users (30 days)" />
-            <TrendChart points={reports.retention.returningUsers} label="Returning users (30 days)" />
-          </div>
+      <div className="card space-y-4">
+        <div>
+          <div className="label">Latest fetched data rows</div>
+          <p className="text-sm text-slate/60">Recent per-day metric rows persisted for this project.</p>
         </div>
-      ) : (
-        <div className="alert">
-          {reportsError ?? "Connect GA4 and sync metrics to unlock project reports."}
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Metric date</th>
+                <th>Fetched at</th>
+                <th>Fetched fields</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adsMetrics.length ? (
+                adsMetrics.map((row) => (
+                  <tr key={row.id} className="border-t border-slate-100">
+                    <td>{row.source}</td>
+                    <td>{formatDateShort(row.date)}</td>
+                    <td>{formatDateTime(row.createdAt)}</td>
+                    <td>{summarizeJson(row.metrics, 6)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-slate-100">
+                  <td colSpan={4}>No fetched metric rows yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Table
-            headers={["Top campaigns", "Clicks", "Revenue"]}
-            rows={campaigns.length ? campaigns.map((row) => row.map((cell) => String(cell))) : [["No data", "-", "-"]]}
-          />
-        </div>
-        <Table
-          headers={["Top sources / medium", "Sessions", "Conv. Rate"]}
-          rows={sources.length ? sources.map((row) => row.map((cell) => String(cell))) : [["No data", "-", "-"]]}
-        />
       </div>
 
-      <Table
-        headers={["Device", "Share", "Users"]}
-        rows={devices.length ? devices.map((row) => row.map((cell) => String(cell))) : [["No data", "-", "-"]]}
-      />
+      <div className="card space-y-4">
+        <div>
+          <div className="label">Ingestion fetch logs</div>
+          <p className="text-sm text-slate/60">Scheduled/cron ingestion history for this project.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Run started</th>
+                <th>Run status</th>
+                <th>Project fetch started</th>
+                <th>Project fetch finished</th>
+                <th>GA4 rows</th>
+                <th>Ads rows</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ingestionLogs.length ? (
+                ingestionLogs.map((log) => (
+                  <tr key={log.id} className="border-t border-slate-100">
+                    <td>{formatDateTime(log.run.startedAt)}</td>
+                    <td>{log.run.status}</td>
+                    <td>{formatDateTime(log.startedAt)}</td>
+                    <td>{formatDateTime(log.finishedAt)}</td>
+                    <td>{log.ga4Inserted}</td>
+                    <td>{log.adsInserted}</td>
+                    <td>{log.error ?? log.run.error ?? "-"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-slate-100">
+                  <td colSpan={7}>No ingestion logs yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <div>
+          <div className="label">API activity logs</div>
+          <p className="text-sm text-slate/60">Manual/source API actions with fetched metadata snapshots.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Message</th>
+                <th>Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activityLogs.length ? (
+                activityLogs.map((log) => (
+                  <tr key={log.id} className="border-t border-slate-100">
+                    <td>{formatDateTime(log.createdAt)}</td>
+                    <td>{log.user?.name ?? log.user?.email ?? "System"}</td>
+                    <td>{log.action}</td>
+                    <td>{log.entityType}</td>
+                    <td>{log.message ?? "-"}</td>
+                    <td>{summarizeMetadata(log.metadata)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-slate-100">
+                  <td colSpan={6}>No API activity logs yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

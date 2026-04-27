@@ -706,12 +706,12 @@ export async function fetchGa4Realtime({
     withRetry(
       () =>
         analyticsData.properties.runRealtimeReport({
-          property: `properties/${propertyId}`,
+          property: `properties/${String(propertyId)}`,
           requestBody: {
             metrics: [{ name: "activeUsers" }],
             dimensions: [{ name: "country" }],
             orderBys: [{ desc: true, metric: { metricName: "activeUsers" } }],
-            limit: 8
+            limit: "8"
           }
         }),
       { label: "ga4" }

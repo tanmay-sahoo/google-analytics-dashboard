@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type Project = {
   id: string;
@@ -21,6 +22,7 @@ export default function AdminProjectsClient({
 }) {
   const [projects, setProjects] = useState(initialProjects);
   const [message, setMessage] = useState<string | null>(null);
+  const messageTone = inferTone(message);
 
   async function refetch() {
     const response = await fetch("/api/projects");
@@ -106,7 +108,7 @@ export default function AdminProjectsClient({
           <input name="currency" className="input" placeholder="Currency" required />
           <button className="btn-primary">Create</button>
         </form>
-        {message ? <div className="mt-3 text-sm text-slate/60">{message}</div> : null}
+        <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
       </div>
 
       <div className="card">

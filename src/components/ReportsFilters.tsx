@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import { addDays, formatDateShort } from "@/lib/time";
 import DateRangePicker from "@/components/DateRangePicker";
+import FlashMessage from "@/components/FlashMessage";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -195,7 +196,7 @@ export default function ReportsFilters({
           ) : null}
         </div>
       </div>
-      {error ? <div className="alert">{error}</div> : null}
+      <FlashMessage message={error} tone="error" onDismiss={() => setError(null)} />
     </div>
   );
 }

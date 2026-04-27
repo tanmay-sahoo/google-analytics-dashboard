@@ -38,6 +38,7 @@ export async function middleware(request: NextRequest) {
     const map: Array<[string, string]> = [
       ["/dashboard", "dashboard"],
       ["/projects", "projects"],
+      ["/ads", "projects"],
       ["/alerts", "alerts"],
       ["/admin/projects", "admin-projects"],
       ["/admin/users", "admin-users"],
@@ -54,5 +55,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/projects/:path*", "/alerts/:path*", "/admin/:path*"]
+  matcher: ["/dashboard/:path*", "/projects/:path*", "/ads/:path*", "/alerts/:path*", "/admin/:path*"]
 };

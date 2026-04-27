@@ -14,9 +14,11 @@ export default async function ReportsDetailPage({
   params,
   searchParams
 }: {
-  params: { key: string };
-  searchParams?: { projectId?: string; range?: string; start?: string; end?: string; refresh?: string };
+  params: Promise<{ key: string }>;
+  searchParams?: Promise<{ projectId?: string; range?: string; start?: string; end?: string; refresh?: string }>;
 }) {
+  const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
@@ -29,7 +31,7 @@ export default async function ReportsDetailPage({
     orderBy: { createdAt: "desc" }
   });
 
-  const selectedId = searchParams?.projectId ?? projects[0]?.id;
+  const selectedId = resolvedSearchParams?.projectId ?? projects[0]?.id;
   if (!selectedId) {
     return <div className="alert">No projects available. Import GA4 properties first.</div>;
   }
@@ -52,13 +54,13 @@ export default async function ReportsDetailPage({
     }
   }
 
-  const reportKey = params.key;
-  const report = reportMap[reportKey];
+  const reportKey = resolvedParams.key;
+  const report = reportMap[reportKey as keyof typeof reportMap];
 
-  const rangeKey = searchParams?.range ?? "last30";
-  const refresh = searchParams?.refresh === "1";
-  const reportEnd = searchParams?.end ? new Date(searchParams.end) : new Date();
-  let reportStart = searchParams?.start ? new Date(searchParams.start) : addDays(reportEnd, -29);
+  const rangeKey = resolvedSearchParams?.range ?? "last30";
+  const refresh = resolvedSearchParams?.refresh === "1";
+  const reportEnd = resolvedSearchParams?.end ? new Date(resolvedSearchParams.end) : new Date();
+  let reportStart = resolvedSearchParams?.start ? new Date(resolvedSearchParams.start) : addDays(reportEnd, -29);
   if (rangeKey === "last7") {
     reportStart = addDays(reportEnd, -6);
   } else if (rangeKey === "last90") {
@@ -115,7 +117,7 @@ export default async function ReportsDetailPage({
               refreshToken: ga4Integration.refreshToken!,
               dimension: report.dimension,
               metric: report.metric,
-              order: report.order ?? "desc",
+              order: ("order" in report ? report.order : undefined) ?? "desc",
               startDate: formatDateShort(reportStart),
               endDate: formatDateShort(reportEnd),
               limit: 100

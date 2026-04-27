@@ -7,7 +7,8 @@ const schema = z.object({
   userIds: z.array(z.string().min(1))
 });
 
-export async function POST(request: Request, context: { params: { id: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -19,7 +20,7 @@ export async function POST(request: Request, context: { params: { id: string } }
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const projectId = context.params.id;
+  const projectId = id;
 
   await prisma.projectUser.deleteMany({ where: { projectId } });
   if (parsed.data.userIds.length > 0) {

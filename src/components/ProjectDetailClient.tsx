@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type PickerType = "GA4" | "ADS" | "MERCHANT";
 
@@ -287,6 +288,7 @@ export default function ProjectDetailClient({
 
   const pickerLoading =
     pickerType === "GA4" ? ga4Loading : pickerType === "ADS" ? adsLoading : merchantLoading;
+  const messageTone = inferTone(message);
 
   return (
     <div className="card space-y-4">
@@ -389,7 +391,7 @@ export default function ProjectDetailClient({
         </label>
       </div>
       <div className="text-xs text-slate/50">OAuth connection is managed in Admin -&gt; Integrations.</div>
-      {message ? <div className="text-sm text-slate/60">{message}</div> : null}
+      <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
 
       {role === "ADMIN" ? (
         <div className="pt-4">
@@ -468,7 +470,7 @@ export default function ProjectDetailClient({
                 onChange={(event) => setConfirmName(event.target.value)}
                 placeholder="Project name"
               />
-              {deleteError ? <div className="text-sm text-red-600">{deleteError}</div> : null}
+              <FlashMessage message={deleteError} tone="error" onDismiss={() => setDeleteError(null)} />
               <div className="flex items-center gap-2">
                 <button className="btn-primary" disabled={deleteLoading} onClick={deleteProject}>
                   {deleteLoading ? "Deleting..." : "Confirm delete"}

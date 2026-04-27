@@ -35,12 +35,14 @@ export default async function AlertsPage() {
         projects={projects.map((project) => ({ id: project.id, name: project.name }))}
         initialRules={rules.map((rule) => ({
           id: rule.id,
+          projectId: rule.projectId,
           metric: rule.metric,
           scope: rule.scope,
           condition: rule.condition,
           threshold: rule.threshold,
           window: rule.window,
           frequency: rule.frequency,
+          cooldownMins: rule.cooldownMins,
           enabled: rule.enabled,
           project: { name: rule.project.name }
         }))}

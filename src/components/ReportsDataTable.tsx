@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import SortableHeader from "@/components/SortableHeader";
 
 type Column = {
   label: string;
@@ -29,6 +30,8 @@ export default function ReportsDataTable({
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [sortKey, setSortKey] = useState<string>("dimension");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
@@ -45,10 +48,36 @@ export default function ReportsDataTable({
     );
   }, [filtered, columns]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  function toggleSort(key: string) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  }
+
+  const sortedRows = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      let compare = 0;
+      if (sortKey === "dimension") {
+        compare = a.label.localeCompare(b.label);
+      } else if (sortKey.startsWith("metric-")) {
+        const columnIndex = Number(sortKey.replace("metric-", ""));
+        const aValue = a.values?.[columnIndex] ?? 0;
+        const bValue = b.values?.[columnIndex] ?? 0;
+        compare = aValue - bValue;
+      }
+      if (compare === 0) compare = a.label.localeCompare(b.label);
+      return compare * direction;
+    });
+  }, [filtered, sortDirection, sortKey]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / perPage));
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * perPage;
-  const paged = filtered.slice(startIndex, startIndex + perPage);
+  const paged = sortedRows.slice(startIndex, startIndex + perPage);
 
   function formatValue(value: number, columnIndex: number) {
     const formatType = columns[columnIndex]?.formatType ?? "number";
@@ -81,8 +110,8 @@ export default function ReportsDataTable({
             </select>
           </label>
           <div>
-            {filtered.length ? `${startIndex + 1}-${Math.min(startIndex + perPage, filtered.length)}` : "0"} of{" "}
-            {filtered.length}
+            {sortedRows.length ? `${startIndex + 1}-${Math.min(startIndex + perPage, sortedRows.length)}` : "0"} of{" "}
+            {sortedRows.length}
           </div>
         </div>
       </div>
@@ -106,10 +135,23 @@ export default function ReportsDataTable({
               <th className="w-10 pb-2 text-left">
                 <input type="checkbox" />
               </th>
-              <th className="pb-2 text-left text-xs uppercase tracking-[0.2em] text-slate/50">{dimensionLabel}</th>
-              {columns.map((column) => (
+              <th className="pb-2 text-left text-xs uppercase tracking-[0.2em] text-slate/50">
+                <SortableHeader
+                  label={dimensionLabel}
+                  active={sortKey === "dimension"}
+                  direction={sortDirection}
+                  onClick={() => toggleSort("dimension")}
+                />
+              </th>
+              {columns.map((column, index) => (
                 <th key={column.label} className="pb-2 text-right text-xs uppercase tracking-[0.2em] text-slate/50">
-                  {column.label}
+                  <SortableHeader
+                    label={column.label}
+                    active={sortKey === `metric-${index}`}
+                    direction={sortDirection}
+                    onClick={() => toggleSort(`metric-${index}`)}
+                    align="right"
+                  />
                 </th>
               ))}
             </tr>
@@ -169,3 +211,4 @@ export default function ReportsDataTable({
     </div>
   );
 }
+

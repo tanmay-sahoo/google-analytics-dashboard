@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import FlashMessage from "@/components/FlashMessage";
 
 type Project = {
   id: string;
@@ -65,7 +66,7 @@ export default function ProjectsListClient({
 
   return (
     <div className="space-y-3">
-      {error ? <div className="alert">{error}</div> : null}
+      <FlashMessage message={error} tone="error" onDismiss={() => setError(null)} />
       <div className="grid gap-4 md:grid-cols-2">
         {projects.map((project) => (
           <div key={project.id} className="card flex items-center justify-between gap-4">

@@ -146,6 +146,8 @@ export async function POST(request: Request) {
                 spend: item.spend,
                 clicks: item.clicks,
                 impressions: item.impressions,
+                conversions: item.conversions,
+                conversionValue: item.conversionValue,
                 roas: item.roas
               }
             },
@@ -157,6 +159,8 @@ export async function POST(request: Request) {
                 spend: item.spend,
                 clicks: item.clicks,
                 impressions: item.impressions,
+                conversions: item.conversions,
+                conversionValue: item.conversionValue,
                 roas: item.roas
               }
             }

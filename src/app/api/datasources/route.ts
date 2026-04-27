@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { logActivity } from "@/lib/logging";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -34,6 +35,18 @@ export async function POST(request: Request) {
     where: { projectId_type: { projectId: parsed.data.projectId, type: parsed.data.type } },
     update: { externalId: parsed.data.externalId },
     create: parsed.data
+  });
+
+  await logActivity({
+    userId: user.id,
+    action: "UPSERT",
+    entityType: "DATASOURCE",
+    entityId: parsed.data.projectId,
+    message: `Saved ${parsed.data.type} data source.`,
+    metadata: {
+      type: parsed.data.type,
+      externalId: parsed.data.externalId
+    }
   });
 
   return NextResponse.json({ id: record.id });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import SortableHeader from "@/components/SortableHeader";
 
 type ActivityItem = {
   id: string;
@@ -52,6 +53,16 @@ export default function AdminLogsClient({
   projectLogs: ProjectLogItem[];
 }) {
   const [tab, setTab] = useState<TabKey>("activity");
+  const [activitySortKey, setActivitySortKey] = useState<"time" | "user" | "action" | "entity" | "message">("time");
+  const [activitySortDirection, setActivitySortDirection] = useState<"asc" | "desc">("desc");
+  const [runsSortKey, setRunsSortKey] = useState<
+    "started" | "finished" | "status" | "projects" | "ga4" | "ads" | "error"
+  >("started");
+  const [runsSortDirection, setRunsSortDirection] = useState<"asc" | "desc">("desc");
+  const [projectsSortKey, setProjectsSortKey] = useState<
+    "project" | "run" | "started" | "finished" | "ga4" | "ads" | "error"
+  >("started");
+  const [projectsSortDirection, setProjectsSortDirection] = useState<"asc" | "desc">("desc");
 
   const runMap = useMemo(() => {
     const map = new Map<string, RunItem>();
@@ -64,6 +75,113 @@ export default function AdminLogsClient({
     { key: "runs" as const, label: "Ingestion runs" },
     { key: "projects" as const, label: "Project fetches" }
   ];
+
+  function toggleActivitySort(key: "time" | "user" | "action" | "entity" | "message") {
+    if (activitySortKey === key) {
+      setActivitySortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setActivitySortKey(key);
+    setActivitySortDirection("asc");
+  }
+
+  function toggleRunsSort(key: "started" | "finished" | "status" | "projects" | "ga4" | "ads" | "error") {
+    if (runsSortKey === key) {
+      setRunsSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setRunsSortKey(key);
+    setRunsSortDirection("asc");
+  }
+
+  function toggleProjectsSort(
+    key: "project" | "run" | "started" | "finished" | "ga4" | "ads" | "error"
+  ) {
+    if (projectsSortKey === key) {
+      setProjectsSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setProjectsSortKey(key);
+    setProjectsSortDirection("asc");
+  }
+
+  const sortedActivity = useMemo(() => {
+    const direction = activitySortDirection === "asc" ? 1 : -1;
+    return [...activity].sort((a, b) => {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      const aUser = (a.user?.name ?? a.user?.email ?? "system").toLowerCase();
+      const bUser = (b.user?.name ?? b.user?.email ?? "system").toLowerCase();
+      const aAction = a.action.toLowerCase();
+      const bAction = b.action.toLowerCase();
+      const aEntity = `${a.entityType} ${a.entityId ?? ""}`.toLowerCase();
+      const bEntity = `${b.entityType} ${b.entityId ?? ""}`.toLowerCase();
+      const aMessage = (a.message ?? "").toLowerCase();
+      const bMessage = (b.message ?? "").toLowerCase();
+
+      let compare = 0;
+      if (activitySortKey === "time") compare = aTime - bTime;
+      else if (activitySortKey === "user") compare = aUser.localeCompare(bUser);
+      else if (activitySortKey === "action") compare = aAction.localeCompare(bAction);
+      else if (activitySortKey === "entity") compare = aEntity.localeCompare(bEntity);
+      else compare = aMessage.localeCompare(bMessage);
+
+      if (compare === 0) compare = aTime - bTime;
+      return compare * direction;
+    });
+  }, [activity, activitySortDirection, activitySortKey]);
+
+  const sortedRuns = useMemo(() => {
+    const direction = runsSortDirection === "asc" ? 1 : -1;
+    return [...runs].sort((a, b) => {
+      const aStarted = new Date(a.startedAt).getTime();
+      const bStarted = new Date(b.startedAt).getTime();
+      const aFinished = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+      const bFinished = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+      const aStatus = a.status.toLowerCase();
+      const bStatus = b.status.toLowerCase();
+      const aError = (a.error ?? "").toLowerCase();
+      const bError = (b.error ?? "").toLowerCase();
+
+      let compare = 0;
+      if (runsSortKey === "started") compare = aStarted - bStarted;
+      else if (runsSortKey === "finished") compare = aFinished - bFinished;
+      else if (runsSortKey === "status") compare = aStatus.localeCompare(bStatus);
+      else if (runsSortKey === "projects") compare = a.totalProjects - b.totalProjects;
+      else if (runsSortKey === "ga4") compare = a.totalGa4 - b.totalGa4;
+      else if (runsSortKey === "ads") compare = a.totalAds - b.totalAds;
+      else compare = aError.localeCompare(bError);
+
+      if (compare === 0) compare = aStarted - bStarted;
+      return compare * direction;
+    });
+  }, [runs, runsSortDirection, runsSortKey]);
+
+  const sortedProjectLogs = useMemo(() => {
+    const direction = projectsSortDirection === "asc" ? 1 : -1;
+    return [...projectLogs].sort((a, b) => {
+      const aRun = runMap.get(a.runId)?.startedAt ?? "";
+      const bRun = runMap.get(b.runId)?.startedAt ?? "";
+      const aStarted = new Date(a.startedAt).getTime();
+      const bStarted = new Date(b.startedAt).getTime();
+      const aFinished = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+      const bFinished = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+      const aError = (a.error ?? "").toLowerCase();
+      const bError = (b.error ?? "").toLowerCase();
+
+      let compare = 0;
+      if (projectsSortKey === "project") compare = a.projectName.localeCompare(b.projectName);
+      else if (projectsSortKey === "run") compare = aRun.localeCompare(bRun);
+      else if (projectsSortKey === "started") compare = aStarted - bStarted;
+      else if (projectsSortKey === "finished") compare = aFinished - bFinished;
+      else if (projectsSortKey === "ga4") compare = a.ga4Inserted - b.ga4Inserted;
+      else if (projectsSortKey === "ads") compare = a.adsInserted - b.adsInserted;
+      else compare = aError.localeCompare(bError);
+
+      if (compare === 0) compare = aStarted - bStarted;
+      return compare * direction;
+    });
+  }, [projectLogs, projectsSortDirection, projectsSortKey, runMap]);
 
   return (
     <div className="card space-y-4">
@@ -95,15 +213,50 @@ export default function AdminLogsClient({
           <table className="table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Message</th>
+                <th>
+                  <SortableHeader
+                    label="Time"
+                    active={activitySortKey === "time"}
+                    direction={activitySortDirection}
+                    onClick={() => toggleActivitySort("time")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="User"
+                    active={activitySortKey === "user"}
+                    direction={activitySortDirection}
+                    onClick={() => toggleActivitySort("user")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Action"
+                    active={activitySortKey === "action"}
+                    direction={activitySortDirection}
+                    onClick={() => toggleActivitySort("action")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Entity"
+                    active={activitySortKey === "entity"}
+                    direction={activitySortDirection}
+                    onClick={() => toggleActivitySort("entity")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Message"
+                    active={activitySortKey === "message"}
+                    direction={activitySortDirection}
+                    onClick={() => toggleActivitySort("message")}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {activity.map((item) => (
+              {sortedActivity.map((item) => (
                 <tr key={item.id} className="border-t border-slate-100">
                   <td>{formatDate(item.createdAt)}</td>
                   <td>{item.user?.name ?? item.user?.email ?? "System"}</td>
@@ -127,17 +280,69 @@ export default function AdminLogsClient({
           <table className="table">
             <thead>
               <tr>
-                <th>Started</th>
-                <th>Finished</th>
-                <th>Status</th>
-                <th>Projects</th>
-                <th>GA4 Rows</th>
-                <th>Ads Rows</th>
-                <th>Error</th>
+                <th>
+                  <SortableHeader
+                    label="Started"
+                    active={runsSortKey === "started"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("started")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Finished"
+                    active={runsSortKey === "finished"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("finished")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Status"
+                    active={runsSortKey === "status"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("status")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Projects"
+                    active={runsSortKey === "projects"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("projects")}
+                    align="right"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="GA4 Rows"
+                    active={runsSortKey === "ga4"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("ga4")}
+                    align="right"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Ads Rows"
+                    active={runsSortKey === "ads"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("ads")}
+                    align="right"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Error"
+                    active={runsSortKey === "error"}
+                    direction={runsSortDirection}
+                    onClick={() => toggleRunsSort("error")}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {runs.map((run) => (
+              {sortedRuns.map((run) => (
                 <tr key={run.id} className="border-t border-slate-100">
                   <td>{formatDate(run.startedAt)}</td>
                   <td>{formatDate(run.finishedAt)}</td>
@@ -160,17 +365,68 @@ export default function AdminLogsClient({
           <table className="table">
             <thead>
               <tr>
-                <th>Project</th>
-                <th>Run</th>
-                <th>Started</th>
-                <th>Finished</th>
-                <th>GA4 Rows</th>
-                <th>Ads Rows</th>
-                <th>Error</th>
+                <th>
+                  <SortableHeader
+                    label="Project"
+                    active={projectsSortKey === "project"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("project")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Run"
+                    active={projectsSortKey === "run"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("run")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Started"
+                    active={projectsSortKey === "started"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("started")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Finished"
+                    active={projectsSortKey === "finished"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("finished")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="GA4 Rows"
+                    active={projectsSortKey === "ga4"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("ga4")}
+                    align="right"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Ads Rows"
+                    active={projectsSortKey === "ads"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("ads")}
+                    align="right"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Error"
+                    active={projectsSortKey === "error"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("error")}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {projectLogs.map((log) => (
+              {sortedProjectLogs.map((log) => (
                 <tr key={log.id} className="border-t border-slate-100">
                   <td>{log.projectName}</td>
                   <td>{formatDate(runMap.get(log.runId)?.startedAt ?? null)}</td>

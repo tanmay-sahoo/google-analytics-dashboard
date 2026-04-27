@@ -9,4 +9,9 @@ build/
 .idea/
 .vscode/
 .next
+.next-build/
+.next-dev/
+.turbo/
+coverage/
+*.tsbuildinfo
 

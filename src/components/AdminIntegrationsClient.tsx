@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type Ga4Property = { id: string; displayName: string; accountId?: string; accountName?: string };
 type AdsCustomer = { id: string; resourceName: string; name?: string };
@@ -200,10 +201,11 @@ export default function AdminIntegrationsClient({
       : pickerType === "MERCHANT"
       ? merchantAccounts.length > 0 && selectedMerchant.size === merchantAccounts.length
       : adsCustomers.length > 0 && selectedAds.size === adsCustomers.length;
+  const messageTone = inferTone(message);
 
   return (
     <div className="space-y-6">
-      {message ? <div className="text-sm text-red-600">{message}</div> : null}
+      <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card space-y-3">
           <div className="label">GA4 Workspace Account</div>

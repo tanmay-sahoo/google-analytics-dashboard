@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       passwordHash,
       role: parsed.data.role,
       isActive: parsed.data.isActive ?? true,
-      menuAccess: parsed.data.menuAccess ?? null,
+      menuAccess: parsed.data.menuAccess ?? undefined,
       createdById: user.id
     }
   });

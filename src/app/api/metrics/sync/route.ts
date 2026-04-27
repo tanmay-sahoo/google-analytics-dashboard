@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { fetchGa4DailyMetrics } from "@/lib/ga4";
-import { fetchAdsDailyMetrics } from "@/lib/google-ads";
+import { fetchAdsDailyMetrics, type AdsDailyMetrics } from "@/lib/google-ads";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 import { logActivity } from "@/lib/logging";
 
@@ -47,8 +47,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "GA4 not connected" }, { status: 400 });
   }
 
-  let ga4Metrics = [];
-  let adsMetrics = [];
+  let ga4Metrics: Awaited<ReturnType<typeof fetchGa4DailyMetrics>> = [];
+  let adsMetrics: AdsDailyMetrics[] = [];
 
   ga4Metrics = await fetchGa4DailyMetrics({
     propertyId: ga4Source.externalId,
@@ -107,6 +107,8 @@ export async function POST(request: Request) {
           spend: item.spend,
           clicks: item.clicks,
           impressions: item.impressions,
+          conversions: item.conversions,
+          conversionValue: item.conversionValue,
           roas: item.roas
         }
       },
@@ -118,6 +120,8 @@ export async function POST(request: Request) {
           spend: item.spend,
           clicks: item.clicks,
           impressions: item.impressions,
+          conversions: item.conversions,
+          conversionValue: item.conversionValue,
           roas: item.roas
         }
       }
@@ -129,7 +133,14 @@ export async function POST(request: Request) {
     action: "SYNC",
     entityType: "METRICS",
     entityId: parsed.data.projectId,
-    message: `Synced metrics (${ga4Metrics.length} GA4 days, ${adsMetrics.length} Ads days).`
+    message: `Synced metrics (${ga4Metrics.length} GA4 days, ${adsMetrics.length} Ads days).`,
+    metadata: {
+      ga4SourceId: ga4Source.externalId,
+      adsSourceId: adsSource?.externalId ?? null,
+      ga4Days: ga4Metrics.length,
+      adsDays: adsMetrics.length,
+      startedAt: new Date().toISOString()
+    }
   });
 
   return NextResponse.json({ ok: true, ga4Days: ga4Metrics.length, adsDays: adsMetrics.length });

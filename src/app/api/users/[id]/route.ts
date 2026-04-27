@@ -13,7 +13,8 @@ const updateSchema = z.object({
   menuAccess: z.array(z.string()).optional()
 });
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -41,7 +42,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
   }
 
   await prisma.user.update({
-    where: { id: context.params.id },
+    where: { id },
     data
   });
 
@@ -49,25 +50,26 @@ export async function PUT(request: Request, context: { params: { id: string } })
     userId: user.id,
     action: "UPDATE",
     entityType: "USER",
-    entityId: context.params.id,
+    entityId: id,
     message: "Updated user."
   });
 
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await prisma.user.delete({ where: { id: context.params.id } });
+  await prisma.user.delete({ where: { id } });
   await logActivity({
     userId: user.id,
     action: "DELETE",
     entityType: "USER",
-    entityId: context.params.id,
+    entityId: id,
     message: "Deleted user."
   });
   return NextResponse.json({ ok: true });

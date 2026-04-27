@@ -1,6 +1,8 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
+import SortableHeader from "@/components/SortableHeader";
 
 type User = {
   id: string;
@@ -38,6 +40,11 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
   const [selectedActive, setSelectedActive] = useState(true);
   const [createRole, setCreateRole] = useState<string>("USER");
   const [createActive, setCreateActive] = useState(true);
+  const messageTone = inferTone(message);
+  const [sortKey, setSortKey] = useState<
+    "name" | "email" | "role" | "status" | "menuAccess" | "createdBy" | "manage"
+  >("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   async function refetch() {
     const response = await fetch("/api/users");
@@ -133,6 +140,49 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
     }
   }
 
+  function toggleSort(
+    key: "name" | "email" | "role" | "status" | "menuAccess" | "createdBy" | "manage"
+  ) {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  }
+
+  const sortedUsers = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    return [...users].sort((a, b) => {
+      const nameA = (a.name ?? "").toLowerCase();
+      const nameB = (b.name ?? "").toLowerCase();
+      const emailA = a.email.toLowerCase();
+      const emailB = b.email.toLowerCase();
+      const roleA = a.role.toLowerCase();
+      const roleB = b.role.toLowerCase();
+      const statusA = a.isActive ? 1 : 0;
+      const statusB = b.isActive ? 1 : 0;
+      const menuA = a.menuAccess?.length ?? 0;
+      const menuB = b.menuAccess?.length ?? 0;
+      const creatorA = (a.createdBy?.name ?? a.createdBy?.email ?? "system").toLowerCase();
+      const creatorB = (b.createdBy?.name ?? b.createdBy?.email ?? "system").toLowerCase();
+
+      let compare = 0;
+      if (sortKey === "name") compare = nameA.localeCompare(nameB);
+      else if (sortKey === "email") compare = emailA.localeCompare(emailB);
+      else if (sortKey === "role") compare = roleA.localeCompare(roleB);
+      else if (sortKey === "status") compare = statusA - statusB;
+      else if (sortKey === "menuAccess") compare = menuA - menuB;
+      else if (sortKey === "createdBy") compare = creatorA.localeCompare(creatorB);
+      else compare = nameA.localeCompare(nameB);
+
+      if (compare === 0) {
+        compare = emailA.localeCompare(emailB);
+      }
+      return compare * direction;
+    });
+  }, [users, sortDirection, sortKey]);
+
   return (
     <div className="space-y-6">
       <div className="section-header">
@@ -153,7 +203,7 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
         </button>
       </div>
 
-      {message ? <div className="alert">{message}</div> : null}
+      <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
 
       {showCreate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate/30 px-4">
@@ -355,17 +405,66 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Menu access</th>
-                <th>Created by</th>
-                <th>Manage</th>
+                <th>
+                  <SortableHeader
+                    label="Name"
+                    active={sortKey === "name"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("name")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Email"
+                    active={sortKey === "email"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("email")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Role"
+                    active={sortKey === "role"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("role")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Status"
+                    active={sortKey === "status"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("status")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Menu access"
+                    active={sortKey === "menuAccess"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("menuAccess")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Created by"
+                    active={sortKey === "createdBy"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("createdBy")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Manage"
+                    active={sortKey === "manage"}
+                    direction={sortDirection}
+                    onClick={() => toggleSort("manage")}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {sortedUsers.map((user) => (
                 <tr key={user.id} className="border-t border-slate-100">
                   <td>{user.name ?? "-"}</td>
                   <td>{user.email}</td>

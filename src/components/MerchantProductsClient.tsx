@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import FlashMessage, { inferTone } from "@/components/FlashMessage";
+import SortableHeader from "@/components/SortableHeader";
 
 type ProjectOption = {
   id: string;
@@ -113,6 +115,12 @@ export default function MerchantProductsClient({
   const [availablePage, setAvailablePage] = useState(1);
   const [importedPage, setImportedPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [availableSortKey, setAvailableSortKey] = useState<"product" | "availability" | "price">("product");
+  const [availableSortDirection, setAvailableSortDirection] = useState<"asc" | "desc">("asc");
+  const [importedSortKey, setImportedSortKey] = useState<
+    "product" | "clicks" | "impressions" | "sales" | "revenue"
+  >("product");
+  const [importedSortDirection, setImportedSortDirection] = useState<"asc" | "desc">("asc");
   const [deleteTarget, setDeleteTarget] = useState<MerchantAccount | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
 
@@ -132,11 +140,6 @@ export default function MerchantProductsClient({
       setSelectedMerchantId(matching);
     }
   }, [selectedProjectId, projects]);
-
-  useEffect(() => {
-    if (!selectedMerchantId || tab !== "products") return;
-    void loadAvailable();
-  }, [selectedMerchantId, tab]);
 
   useEffect(() => {
     void loadAiSettings();
@@ -184,7 +187,7 @@ export default function MerchantProductsClient({
           }
           seenTokens.add(pageToken);
         }
-        const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+        const tokenParam: string = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
         const response = await fetch(
           `/api/merchant/products?merchantId=${selectedMerchantId}&projectId=${selectedProjectId}&paged=1${tokenParam}`,
           { signal: controller.signal }
@@ -228,9 +231,12 @@ export default function MerchantProductsClient({
 
   async function importSelected() {
     if (!selectedProjectId || !selectedMerchantId) return;
-    const payload = available.filter((item) => selected.has(item.offerId));
+    const existingOfferIds = new Set(imported.map((item) => item.offerId));
+    const payload = available.filter(
+      (item) => selected.has(item.offerId) && !existingOfferIds.has(item.offerId)
+    );
     if (payload.length === 0) {
-      setMessage("Select at least one product to import.");
+      setMessage("Select at least one new product to import.");
       return;
     }
     setImporting(true);
@@ -238,6 +244,8 @@ export default function MerchantProductsClient({
     setImportTotal(payload.length);
     setMessage(null);
     const batchSize = 1000;
+    let insertedTotal = 0;
+    let skippedTotal = 0;
     try {
       for (let index = 0; index < payload.length; index += batchSize) {
         const batch = payload.slice(index, index + batchSize);
@@ -256,9 +264,16 @@ export default function MerchantProductsClient({
           setImporting(false);
           return;
         }
+        const data = await response.json().catch(() => ({}));
+        insertedTotal += Number(data.imported ?? batch.length);
+        skippedTotal += Number(data.skippedExisting ?? 0);
         setImportedCount(Math.min(index + batch.length, payload.length));
       }
-      setMessage(`Imported ${payload.length} products.`);
+      if (skippedTotal > 0) {
+        setMessage(`Imported ${insertedTotal} products. Skipped ${skippedTotal} already imported.`);
+      } else {
+        setMessage(`Imported ${insertedTotal} products.`);
+      }
     } finally {
       setImporting(false);
       void loadImported();
@@ -308,17 +323,85 @@ export default function MerchantProductsClient({
     `${item.title} ${item.offerId}`.toLowerCase().includes(importedQuery.toLowerCase())
   );
 
-  const allSelected =
-    filteredAvailable.length > 0 &&
-    filteredAvailable.every((item) => selected.has(item.offerId));
+  function toggleAvailableSort(key: "product" | "availability" | "price") {
+    if (availableSortKey === key) {
+      setAvailableSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setAvailableSortKey(key);
+    setAvailableSortDirection("asc");
+  }
 
-  const availablePageData = paginate(filteredAvailable, availablePage, rowsPerPage);
-  const importedPageData = paginate(filteredImported, importedPage, rowsPerPage);
+  function toggleImportedSort(key: "product" | "clicks" | "impressions" | "sales" | "revenue") {
+    if (importedSortKey === key) {
+      setImportedSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setImportedSortKey(key);
+    setImportedSortDirection("asc");
+  }
+
+  const sortedAvailable = useMemo(() => {
+    const direction = availableSortDirection === "asc" ? 1 : -1;
+    return [...filteredAvailable].sort((a, b) => {
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+      const aAvailability = (a.availability ?? "").toLowerCase();
+      const bAvailability = (b.availability ?? "").toLowerCase();
+      const aPrice = a.priceValue ?? 0;
+      const bPrice = b.priceValue ?? 0;
+
+      let compare = 0;
+      if (availableSortKey === "product") compare = aTitle.localeCompare(bTitle);
+      else if (availableSortKey === "availability") compare = aAvailability.localeCompare(bAvailability);
+      else compare = aPrice - bPrice;
+
+      if (compare === 0) compare = aTitle.localeCompare(bTitle);
+      return compare * direction;
+    });
+  }, [availableSortDirection, availableSortKey, filteredAvailable]);
+
+  const sortedImported = useMemo(() => {
+    const direction = importedSortDirection === "asc" ? 1 : -1;
+    return [...filteredImported].sort((a, b) => {
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+      const aClicks = a.clicks ?? 0;
+      const bClicks = b.clicks ?? 0;
+      const aImpressions = a.impressions ?? 0;
+      const bImpressions = b.impressions ?? 0;
+      const aSales = a.sales ?? 0;
+      const bSales = b.sales ?? 0;
+      const aRevenue = a.revenue ?? 0;
+      const bRevenue = b.revenue ?? 0;
+
+      let compare = 0;
+      if (importedSortKey === "product") compare = aTitle.localeCompare(bTitle);
+      else if (importedSortKey === "clicks") compare = aClicks - bClicks;
+      else if (importedSortKey === "impressions") compare = aImpressions - bImpressions;
+      else if (importedSortKey === "sales") compare = aSales - bSales;
+      else compare = aRevenue - bRevenue;
+
+      if (compare === 0) compare = aTitle.localeCompare(bTitle);
+      return compare * direction;
+    });
+  }, [filteredImported, importedSortDirection, importedSortKey]);
+
+  const importedOfferIds = useMemo(() => new Set(imported.map((item) => item.offerId)), [imported]);
+  const selectableAvailable = sortedAvailable.filter((item) => !importedOfferIds.has(item.offerId));
+
+  const allSelected =
+    selectableAvailable.length > 0 &&
+    selectableAvailable.every((item) => selected.has(item.offerId));
+
+  const availablePageData = paginate(sortedAvailable, availablePage, rowsPerPage);
+  const importedPageData = paginate(sortedImported, importedPage, rowsPerPage);
 
   const selling = imported.filter((item) => (item.sales ?? 0) > 0);
   const nonSelling = imported.filter((item) => (item.sales ?? 0) === 0);
 
   const aiReady = Boolean(aiSettings?.provider && aiSettings?.model);
+  const messageTone = inferTone(message);
 
   return (
     <>
@@ -354,7 +437,7 @@ export default function MerchantProductsClient({
           {tab === "merchants" ? (
             <div className="space-y-4">
               <div className="text-sm text-slate/60">Select a Merchant account to manage products.</div>
-              {message ? <div className="alert">{message}</div> : null}
+              <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
               {importedMerchants.length === 0 ? (
                 <div className="text-sm text-slate/50">No Merchant accounts imported yet.</div>
               ) : (
@@ -459,7 +542,7 @@ export default function MerchantProductsClient({
               </div>
             </div>
 
-            {message ? <div className="alert">{message}</div> : null}
+            <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
             {loading ? (
               <div className="text-xs text-slate/60">
                 Fetching products... {loadingCount > 0 ? `${loadingCount} loaded` : "Starting"}
@@ -505,16 +588,38 @@ export default function MerchantProductsClient({
                               checked={allSelected}
                               onChange={(event) => {
                                 if (event.target.checked) {
-                                  setSelected(new Set(filteredAvailable.map((item) => item.offerId)));
+                                  setSelected(new Set(selectableAvailable.map((item) => item.offerId)));
                                 } else {
                                   setSelected(new Set());
                                 }
                               }}
                             />
                           </th>
-                          <th>Product</th>
-                          <th>Availability</th>
-                          <th className="text-right">Price</th>
+                          <th>
+                            <SortableHeader
+                              label="Product"
+                              active={availableSortKey === "product"}
+                              direction={availableSortDirection}
+                              onClick={() => toggleAvailableSort("product")}
+                            />
+                          </th>
+                          <th>
+                            <SortableHeader
+                              label="Availability"
+                              active={availableSortKey === "availability"}
+                              direction={availableSortDirection}
+                              onClick={() => toggleAvailableSort("availability")}
+                            />
+                          </th>
+                          <th className="text-right">
+                            <SortableHeader
+                              label="Price"
+                              active={availableSortKey === "price"}
+                              direction={availableSortDirection}
+                              onClick={() => toggleAvailableSort("price")}
+                              align="right"
+                            />
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -528,23 +633,33 @@ export default function MerchantProductsClient({
                           availablePageData.items.map((item) => (
                             <tr key={item.offerId} className="border-t border-slate-100">
                               <td>
-                                <input
-                                  type="checkbox"
-                                  checked={selected.has(item.offerId)}
-                                  onChange={(event) => {
-                                    const next = new Set(selected);
-                                    if (event.target.checked) {
-                                      next.add(item.offerId);
-                                    } else {
-                                      next.delete(item.offerId);
-                                    }
-                                    setSelected(next);
-                                  }}
-                                />
+                                {importedOfferIds.has(item.offerId) ? (
+                                  <span
+                                    className="inline-flex h-4 w-4 rounded border border-slate/20 bg-slate/10"
+                                    title="Already imported"
+                                  />
+                                ) : (
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.has(item.offerId)}
+                                    onChange={(event) => {
+                                      const next = new Set(selected);
+                                      if (event.target.checked) {
+                                        next.add(item.offerId);
+                                      } else {
+                                        next.delete(item.offerId);
+                                      }
+                                      setSelected(next);
+                                    }}
+                                  />
+                                )}
                               </td>
                               <td>
                                 <div className="font-semibold">{item.title}</div>
                                 <div className="text-xs text-slate/50">{item.offerId}</div>
+                                {importedOfferIds.has(item.offerId) ? (
+                                  <div className="text-xs text-emerald-600">Already imported</div>
+                                ) : null}
                               </td>
                               <td>{item.availability ?? "-"}</td>
                               <td className="text-right">
@@ -599,11 +714,50 @@ export default function MerchantProductsClient({
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>Product</th>
-                          <th className="text-right">Clicks</th>
-                          <th className="text-right">Impressions</th>
-                          <th className="text-right">Sales</th>
-                          <th className="text-right">Revenue</th>
+                          <th>
+                            <SortableHeader
+                              label="Product"
+                              active={importedSortKey === "product"}
+                              direction={importedSortDirection}
+                              onClick={() => toggleImportedSort("product")}
+                            />
+                          </th>
+                          <th className="text-right">
+                            <SortableHeader
+                              label="Clicks"
+                              active={importedSortKey === "clicks"}
+                              direction={importedSortDirection}
+                              onClick={() => toggleImportedSort("clicks")}
+                              align="right"
+                            />
+                          </th>
+                          <th className="text-right">
+                            <SortableHeader
+                              label="Impressions"
+                              active={importedSortKey === "impressions"}
+                              direction={importedSortDirection}
+                              onClick={() => toggleImportedSort("impressions")}
+                              align="right"
+                            />
+                          </th>
+                          <th className="text-right">
+                            <SortableHeader
+                              label="Sales"
+                              active={importedSortKey === "sales"}
+                              direction={importedSortDirection}
+                              onClick={() => toggleImportedSort("sales")}
+                              align="right"
+                            />
+                          </th>
+                          <th className="text-right">
+                            <SortableHeader
+                              label="Revenue"
+                              active={importedSortKey === "revenue"}
+                              direction={importedSortDirection}
+                              onClick={() => toggleImportedSort("revenue")}
+                              align="right"
+                            />
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -664,7 +818,7 @@ export default function MerchantProductsClient({
 
           {tab === "insights" ? (
             <div className="space-y-4">
-              {message ? <div className="alert">{message}</div> : null}
+              <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
               <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
                 <div className="card space-y-2">
                   <div className="label">AI suggestions</div>

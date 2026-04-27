@@ -30,7 +30,9 @@ export async function GET(request: Request) {
   const { type } = parsedState;
 
   const tokens = await exchangeCode(code);
-  const email = tokens.access_token ? await getUserEmail(tokens) : null;
+  const email = tokens.access_token
+    ? await getUserEmail({ ...tokens, access_token: tokens.access_token ?? undefined })
+    : null;
 
   await prisma.integrationSetting.upsert({
     where: { type },

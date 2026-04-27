@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 
-export async function PUT(request: Request, context: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +20,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
     }
 
     const updated = await prisma.aiConfig.update({
-      where: { id: context.params.id },
+      where: { id },
       data: {
         ...(provider ? { provider } : {}),
         ...(model ? { model } : {}),
@@ -49,17 +50,18 @@ export async function PUT(request: Request, context: { params: { id: string } })
   }
 }
 
-export async function DELETE(_: Request, context: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const target = await prisma.aiConfig.findUnique({ where: { id: context.params.id } });
+    const target = await prisma.aiConfig.findUnique({ where: { id } });
     if (!target) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    await prisma.aiConfig.delete({ where: { id: context.params.id } });
+    await prisma.aiConfig.delete({ where: { id } });
 
     if (target.isDefault) {
       const next = await prisma.aiConfig.findFirst({ orderBy: { createdAt: "desc" } });

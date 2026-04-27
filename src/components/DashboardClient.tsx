@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import FlashMessage from "@/components/FlashMessage";
 import {
   Area,
   AreaChart,
@@ -403,10 +404,11 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {filterError ? <div className="alert">{filterError}</div> : null}
-      {status === "error" && (
-        <div className="alert">Failed to load dashboard data. Try again.</div>
-      )}
+      <FlashMessage message={filterError} tone="error" onDismiss={() => setFilterError(null)} />
+      <FlashMessage
+        message={status === "error" ? "Failed to load dashboard data. Try again." : null}
+        tone="error"
+      />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="card space-y-6">

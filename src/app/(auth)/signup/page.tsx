@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import FlashMessage from "@/components/FlashMessage";
 
 export default function SignUpPage() {
   const [message, setMessage] = useState<string | null>(null);
@@ -49,8 +50,8 @@ export default function SignUpPage() {
           <input name="name" placeholder="Name" className="input" />
           <input name="email" type="email" placeholder="Email" className="input" required />
           <input name="password" type="password" placeholder="Password" className="input" required />
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
-          {message ? <div className="text-sm text-emerald-600">{message}</div> : null}
+          <FlashMessage message={error} tone="error" onDismiss={() => setError(null)} />
+          <FlashMessage message={message} tone="success" onDismiss={() => setMessage(null)} />
           <button className="btn-primary w-full" disabled={loading}>
             {loading ? "Creating..." : "Create account"}
           </button>

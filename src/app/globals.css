@@ -312,7 +312,79 @@ body {
 }
 
 .alert {
-  @apply rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800;
+  @apply rounded-2xl border border-sky-200/90 bg-sky-50/90 px-4 py-3 text-sm font-medium text-sky-900 shadow-sm;
+}
+
+[data-theme="dark"] .alert,
+.app-shell[data-theme="dark"] .alert {
+  @apply border-sky-300/30 bg-sky-500/10 text-sky-100;
+}
+
+.flash-message {
+  color: var(--flash-text);
+  border-color: var(--flash-border);
+  background: var(--flash-bg);
+}
+
+.flash-message .flash-message-icon {
+  border-color: color-mix(in srgb, var(--flash-text) 28%, transparent);
+  background: color-mix(in srgb, var(--flash-bg) 65%, #ffffff 35%);
+}
+
+.flash-message .flash-message-close {
+  color: color-mix(in srgb, var(--flash-text) 88%, #111827 12%);
+}
+
+.flash-info {
+  --flash-border: #bdd7fe;
+  --flash-bg: linear-gradient(135deg, #f6fbff 0%, #edf6ff 100%);
+  --flash-text: #1e3a8a;
+}
+
+.flash-success {
+  --flash-border: #b7e2c4;
+  --flash-bg: linear-gradient(135deg, #f4fdf7 0%, #ebf9f0 100%);
+  --flash-text: #14532d;
+}
+
+.flash-warning {
+  --flash-border: #f2d191;
+  --flash-bg: linear-gradient(135deg, #fffcf5 0%, #fff5de 100%);
+  --flash-text: #7c4a03;
+}
+
+.flash-error {
+  --flash-border: #f3bec8;
+  --flash-bg: linear-gradient(135deg, #fff8f9 0%, #fff0f2 100%);
+  --flash-text: #881337;
+}
+
+[data-theme="dark"] .flash-info,
+.app-shell[data-theme="dark"] .flash-info {
+  --flash-border: rgba(125, 182, 255, 0.45);
+  --flash-bg: linear-gradient(135deg, rgba(18, 48, 100, 0.48) 0%, rgba(12, 32, 70, 0.48) 100%);
+  --flash-text: #dbeafe;
+}
+
+[data-theme="dark"] .flash-success,
+.app-shell[data-theme="dark"] .flash-success {
+  --flash-border: rgba(74, 222, 128, 0.35);
+  --flash-bg: linear-gradient(135deg, rgba(8, 58, 39, 0.58) 0%, rgba(5, 42, 29, 0.58) 100%);
+  --flash-text: #dcfce7;
+}
+
+[data-theme="dark"] .flash-warning,
+.app-shell[data-theme="dark"] .flash-warning {
+  --flash-border: rgba(245, 158, 11, 0.45);
+  --flash-bg: linear-gradient(135deg, rgba(86, 47, 7, 0.58) 0%, rgba(64, 36, 8, 0.58) 100%);
+  --flash-text: #fef3c7;
+}
+
+[data-theme="dark"] .flash-error,
+.app-shell[data-theme="dark"] .flash-error {
+  --flash-border: rgba(251, 113, 133, 0.4);
+  --flash-bg: linear-gradient(135deg, rgba(99, 17, 40, 0.58) 0%, rgba(76, 13, 33, 0.58) 100%);
+  --flash-text: #ffe4e6;
 }
 
 /* Dark theme overrides (placed last to win cascade). */

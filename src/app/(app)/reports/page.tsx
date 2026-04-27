@@ -12,8 +12,16 @@ import ReportsDataTable from "@/components/ReportsDataTable";
 export default async function ReportsPage({
   searchParams
 }: {
-  searchParams?: { projectId?: string; report?: string; range?: string; start?: string; end?: string; refresh?: string };
+  searchParams?: Promise<{
+    projectId?: string;
+    report?: string;
+    range?: string;
+    start?: string;
+    end?: string;
+    refresh?: string;
+  }>;
 }) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
@@ -26,10 +34,10 @@ export default async function ReportsPage({
     orderBy: { createdAt: "desc" }
   });
 
-  const selectedId = searchParams?.projectId ?? projects[0]?.id;
-  const reportKey = searchParams?.report ?? "snapshot";
-  const rangeKey = searchParams?.range ?? "last30";
-  const refresh = searchParams?.refresh === "1";
+  const selectedId = resolvedSearchParams?.projectId ?? projects[0]?.id;
+  const reportKey = resolvedSearchParams?.report ?? "snapshot";
+  const rangeKey = resolvedSearchParams?.range ?? "last30";
+  const refresh = resolvedSearchParams?.refresh === "1";
   if (!selectedId) {
     return (
       <div className="alert">No projects available. Import GA4 properties first.</div>
@@ -60,8 +68,8 @@ export default async function ReportsPage({
 
   const ga4Source = project.dataSources.find((item) => item.type === "GA4");
   const ga4Integration = await prisma.integrationSetting.findUnique({ where: { type: "GA4" } });
-  const reportEnd = searchParams?.end ? new Date(searchParams.end) : new Date();
-  let reportStart = searchParams?.start ? new Date(searchParams.start) : addDays(reportEnd, -29);
+  const reportEnd = resolvedSearchParams?.end ? new Date(resolvedSearchParams.end) : new Date();
+  let reportStart = resolvedSearchParams?.start ? new Date(resolvedSearchParams.start) : addDays(reportEnd, -29);
   if (rangeKey === "last7") {
     reportStart = addDays(reportEnd, -6);
   } else if (rangeKey === "last90") {
@@ -164,7 +172,7 @@ export default async function ReportsPage({
         range={rangeKey as any}
         start={formatDateShort(reportStart)}
         end={formatDateShort(reportEnd)}
-        refresh={searchParams?.refresh}
+        refresh={resolvedSearchParams?.refresh}
         basePath="/reports"
       />
 
