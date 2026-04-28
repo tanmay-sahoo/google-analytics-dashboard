@@ -6,6 +6,21 @@ import { fetchGa4DailyMetricsRange } from "@/lib/ga4";
 import { fetchAdsDailyMetrics } from "@/lib/google-ads";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 
+export const maxDuration = 300;
+
+const PROJECT_CONCURRENCY = Math.max(1, Number(process.env.INGEST_PROJECT_CONCURRENCY) || 5);
+const INTER_CHUNK_DELAY_MS = Math.max(0, Number(process.env.INGEST_INTER_CHUNK_DELAY_MS) || 250);
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 function hasValidCronSecret(request: Request, secret: string | undefined) {
   if (!secret) return false;
   const header = request.headers.get("x-cron-secret");
@@ -44,6 +59,7 @@ export async function POST(request: Request) {
   if (!ga4Integration?.refreshToken) {
     return NextResponse.json({ error: "GA4 not connected" }, { status: 400 });
   }
+  const ga4RefreshToken: string = ga4Integration.refreshToken;
 
   const projects = await prisma.project.findMany({
     include: { dataSources: true }
@@ -64,11 +80,13 @@ export async function POST(request: Request) {
     }
   });
 
-  for (const project of projects) {
+  type ProjectRow = (typeof projects)[number];
+
+  async function ingestProject(project: ProjectRow) {
     const ga4Source = project.dataSources.find((item) => item.type === "GA4");
     const adsSource = project.dataSources.find((item) => item.type === "ADS");
     if (!ga4Source?.externalId) {
-      continue;
+      return null;
     }
 
     const projectLog = await prisma.ingestionProjectLog.create({
@@ -98,7 +116,7 @@ export async function POST(request: Request) {
         startDate <= endDate
           ? await fetchGa4DailyMetricsRange({
               propertyId: ga4Source.externalId,
-              refreshToken: ga4Integration.refreshToken,
+              refreshToken: ga4RefreshToken,
               startDate: formatDateShort(startDate),
               endDate: formatDateShort(endDate)
             })
@@ -228,16 +246,6 @@ export async function POST(request: Request) {
     }
 
     const projectError = projectErrors.length ? projectErrors.join(" | ") : undefined;
-    if (projectError) {
-      failedProjects += 1;
-    }
-
-    results.push({
-      projectId: project.id,
-      ga4Inserted,
-      adsInserted,
-      error: projectError
-    });
 
     await prisma.ingestionProjectLog.update({
       where: { id: projectLog.id },
@@ -248,6 +256,32 @@ export async function POST(request: Request) {
         finishedAt: new Date()
       }
     });
+
+    return {
+      projectId: project.id,
+      ga4Inserted,
+      adsInserted,
+      error: projectError
+    };
+  }
+
+  for (const group of chunk(projects, PROJECT_CONCURRENCY)) {
+    const settled = await Promise.allSettled(group.map((project) => ingestProject(project)));
+    for (const item of settled) {
+      if (item.status === "fulfilled") {
+        if (item.value) {
+          results.push(item.value);
+          if (item.value.error) failedProjects += 1;
+        }
+      } else {
+        failedProjects += 1;
+        const message = item.reason instanceof Error ? item.reason.message : String(item.reason);
+        results.push({ projectId: "unknown", ga4Inserted: 0, adsInserted: 0, error: message });
+      }
+    }
+    if (INTER_CHUNK_DELAY_MS > 0) {
+      await sleep(INTER_CHUNK_DELAY_MS);
+    }
   }
 
   await prisma.ingestionRun.update({

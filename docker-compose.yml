@@ -28,7 +28,9 @@ services:
       NODE_ENV: production
       PORT: 3002
       HOSTNAME: 0.0.0.0
-      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-marketing_data_hub}?schema=public
+      # Web container does NOT run the worker — see the dedicated `worker` service below.
+      START_WORKER: "false"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-marketing_data_hub}?schema=public&connection_limit=25&pool_timeout=20
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3002}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
@@ -40,9 +42,37 @@ services:
       GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
       GOOGLE_ADS_MANAGER_CUSTOMER_ID: ${GOOGLE_ADS_MANAGER_CUSTOMER_ID:-}
       GOOGLE_ADS_API_VERSION: ${GOOGLE_ADS_API_VERSION:-v20}
+      # Tunables for response caching (seconds).
+      GA4_REPORT_CACHE_TTL_SEC: ${GA4_REPORT_CACHE_TTL_SEC:-300}
+      GA4_REALTIME_CACHE_TTL_SEC: ${GA4_REALTIME_CACHE_TTL_SEC:-30}
+      ADS_REPORT_CACHE_TTL_SEC: ${ADS_REPORT_CACHE_TTL_SEC:-300}
     depends_on:
       db:
         condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["node", "scripts/ingestion-worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-marketing_data_hub}?schema=public&connection_limit=10&pool_timeout=20
+      APP_BASE_URL: http://app:3002
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3002}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      # Ingestion concurrency tunables.
+      INGEST_PROJECT_CONCURRENCY: ${INGEST_PROJECT_CONCURRENCY:-5}
+      INGEST_INTER_CHUNK_DELAY_MS: ${INGEST_INTER_CHUNK_DELAY_MS:-250}
+      ALERT_EVAL_INTERVAL_MS: ${ALERT_EVAL_INTERVAL_MS:-300000}
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
 
 volumes:
   db-data:

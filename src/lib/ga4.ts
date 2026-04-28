@@ -2,6 +2,10 @@ import { google } from "googleapis";
 import { getOAuthClient } from "@/lib/google-oauth";
 import { addDays, formatDateShort } from "@/lib/time";
 import { createLimiter, withRetry } from "@/lib/request-limiter";
+import { cachedWithKeys } from "@/lib/api-cache";
+import { buildRangeKey, getOrFetchSnapshot, parseShortDate } from "@/lib/report-snapshots";
+
+const TTL_REALTIME_SECONDS = Number(process.env.GA4_REALTIME_CACHE_TTL_SEC) || 30;
 
 export type Ga4DailyMetrics = {
   date: Date;
@@ -168,21 +172,55 @@ async function runBreakdown({
   });
 }
 
-export async function fetchGa4Breakdowns({
-  propertyId,
-  refreshToken
-}: {
+export async function fetchGa4Breakdowns(params: {
   propertyId: string;
   refreshToken: string;
 }) {
-  const campaigns = await runBreakdown({ propertyId, refreshToken, dimension: "campaignName", limit: 10 });
-  const sources = await runBreakdown({ propertyId, refreshToken, dimension: "sessionSourceMedium", limit: 10 });
-  const devices = await runBreakdown({ propertyId, refreshToken, dimension: "deviceCategory", limit: 10 });
-
-  return { campaigns, sources, devices };
+  // runBreakdown uses a hardcoded last-30-days window relative to today, so
+  // the snapshot key is keyed by today's UTC date.
+  const today = new Date();
+  const todayShort = formatDateShort(today);
+  const startShort = formatDateShort(addDays(today, -29));
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-breakdowns",
+    rangeKey: buildRangeKey({ startDate: startShort, endDate: todayShort }),
+    startDate: parseShortDate(startShort),
+    endDate: parseShortDate(todayShort),
+    fetcher: async () => {
+      const { propertyId, refreshToken } = params;
+      const campaigns = await runBreakdown({ propertyId, refreshToken, dimension: "campaignName", limit: 10 });
+      const sources = await runBreakdown({ propertyId, refreshToken, dimension: "sessionSourceMedium", limit: 10 });
+      const devices = await runBreakdown({ propertyId, refreshToken, dimension: "deviceCategory", limit: 10 });
+      return { campaigns, sources, devices };
+    }
+  });
 }
 
-export async function fetchGa4CityMetrics({
+export async function fetchGa4CityMetrics(params: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+}): Promise<Ga4CityRow[]> {
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-city-metrics",
+    rangeKey: buildRangeKey({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      extra: { limit: params.limit ?? 300 }
+    }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchGa4CityMetricsUncached(params)
+  });
+}
+
+async function fetchGa4CityMetricsUncached({
   propertyId,
   refreshToken,
   startDate,
@@ -349,7 +387,24 @@ async function runSeriesReport({
   return { dates, series };
 }
 
-export async function fetchGa4Highlights({
+export async function fetchGa4Highlights(params: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+}) {
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-highlights",
+    rangeKey: buildRangeKey({ startDate: params.startDate, endDate: params.endDate }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchGa4HighlightsUncached(params)
+  });
+}
+
+async function fetchGa4HighlightsUncached({
   propertyId,
   refreshToken,
   startDate,
@@ -418,7 +473,24 @@ export async function fetchGa4Highlights({
   return { events, sources, landingPages, userAcquisition, sessionAcquisition, countries };
 }
 
-export async function fetchGa4ProjectReports({
+export async function fetchGa4ProjectReports(params: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+}) {
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-project-reports",
+    rangeKey: buildRangeKey({ startDate: params.startDate, endDate: params.endDate }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchGa4ProjectReportsUncached(params)
+  });
+}
+
+async function fetchGa4ProjectReportsUncached({
   propertyId,
   refreshToken,
   startDate,
@@ -601,7 +673,37 @@ export async function fetchGa4ProjectReports({
   };
 }
 
-export async function fetchGa4ReportDetail({
+export async function fetchGa4ReportDetail(params: {
+  propertyId: string;
+  refreshToken: string;
+  dimension: string;
+  metric: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+  order?: "asc" | "desc";
+}) {
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-report-detail",
+    rangeKey: buildRangeKey({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      extra: {
+        dimension: params.dimension,
+        metric: params.metric,
+        limit: params.limit ?? 100,
+        order: params.order ?? "desc"
+      }
+    }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchGa4ReportDetailUncached(params)
+  });
+}
+
+async function fetchGa4ReportDetailUncached({
   propertyId,
   refreshToken,
   dimension,
@@ -632,7 +734,29 @@ export async function fetchGa4ReportDetail({
   });
 }
 
-export async function fetchGa4EcommerceReport({
+export async function fetchGa4EcommerceReport(params: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+}) {
+  return getOrFetchSnapshot({
+    source: "ga4",
+    externalId: params.propertyId,
+    reportType: "ga4-ecommerce",
+    rangeKey: buildRangeKey({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      extra: { limit: params.limit ?? 100 }
+    }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchGa4EcommerceReportUncached(params)
+  });
+}
+
+async function fetchGa4EcommerceReportUncached({
   propertyId,
   refreshToken,
   startDate,
@@ -763,7 +887,16 @@ export async function fetchGa4EcommerceReport({
   };
 }
 
-export async function fetchGa4Realtime({
+export async function fetchGa4Realtime(params: {
+  propertyId: string;
+  refreshToken: string;
+}): Promise<{ activeUsers: number; countries: { label: string; value: number }[] }> {
+  return cachedWithKeys("ga4:realtime", params, TTL_REALTIME_SECONDS, () =>
+    fetchGa4RealtimeUncached(params)
+  );
+}
+
+async function fetchGa4RealtimeUncached({
   propertyId,
   refreshToken
 }: {

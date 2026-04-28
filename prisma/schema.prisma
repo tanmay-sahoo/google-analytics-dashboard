@@ -328,3 +328,19 @@ model Notification {
   @@index([userId, readAt])
   @@index([userId, createdAt])
 }
+
+model ReportSnapshot {
+  id         String   @id @default(cuid())
+  source     String   // "ga4" | "ads"
+  externalId String   // GA4 propertyId or Ads customerId
+  reportType String   // e.g. "ga4-project-reports", "ga4-ecommerce", "ads-intelligence"
+  rangeKey   String   // canonical key including dates and any extra params (dimension, metric, ...)
+  startDate  DateTime
+  endDate    DateTime
+  data       Json
+  fetchedAt  DateTime @default(now())
+
+  @@unique([source, externalId, reportType, rangeKey])
+  @@index([source, externalId, reportType])
+  @@index([fetchedAt])
+}

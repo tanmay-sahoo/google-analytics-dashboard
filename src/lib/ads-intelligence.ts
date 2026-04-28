@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createLimiter, withRetry } from "@/lib/request-limiter";
+import { buildRangeKey, getOrFetchSnapshot, parseShortDate } from "@/lib/report-snapshots";
 import { getOAuthClient } from "@/lib/google-oauth";
 
 type NumericLike = number | string | null | undefined;
@@ -478,7 +479,24 @@ function aggregateBreakdownRows(rows: AdsBreakdownRow[]) {
     .sort((a, b) => b.spend - a.spend || b.conversionValue - a.conversionValue);
 }
 
-export async function fetchAdsIntelligence({
+export async function fetchAdsIntelligence(params: {
+  customerId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+}): Promise<AdsIntelligenceData> {
+  return getOrFetchSnapshot({
+    source: "ads",
+    externalId: params.customerId,
+    reportType: "ads-intelligence",
+    rangeKey: buildRangeKey({ startDate: params.startDate, endDate: params.endDate }),
+    startDate: parseShortDate(params.startDate),
+    endDate: parseShortDate(params.endDate),
+    fetcher: () => fetchAdsIntelligenceUncached(params)
+  });
+}
+
+async function fetchAdsIntelligenceUncached({
   customerId,
   refreshToken,
   startDate,

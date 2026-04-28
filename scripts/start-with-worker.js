@@ -31,11 +31,16 @@ if (isDev && process.env.CLEAN_NEXT_DEV_CACHE !== "0") {
 const app = run("next", [isDev ? "dev" : "start"], "app", {
   NEXT_DIST_DIR: distDir
 });
-const worker = run("node", ["scripts/ingestion-worker.js"], "worker");
+
+const startWorker = (process.env.START_WORKER ?? "true").toLowerCase() !== "false";
+const worker = startWorker ? run("node", ["scripts/ingestion-worker.js"], "worker") : null;
+if (!startWorker) {
+  console.log("[start-with-worker] START_WORKER=false — skipping in-process worker.");
+}
 
 const shutdown = () => {
   app.kill("SIGTERM");
-  worker.kill("SIGTERM");
+  if (worker) worker.kill("SIGTERM");
 };
 
 process.on("SIGINT", shutdown);
