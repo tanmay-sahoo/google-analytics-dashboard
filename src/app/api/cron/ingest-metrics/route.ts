@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { addDays, formatDateShort } from "@/lib/time";
@@ -5,18 +6,20 @@ import { fetchGa4DailyMetricsRange } from "@/lib/ga4";
 import { fetchAdsDailyMetrics } from "@/lib/google-ads";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 
-function canRunCron(request: Request, secret: string | undefined) {
-  if (!secret) {
-    return true;
-  }
+function hasValidCronSecret(request: Request, secret: string | undefined) {
+  if (!secret) return false;
   const header = request.headers.get("x-cron-secret");
-  return header === secret;
+  if (!header) return false;
+  const headerBuf = Buffer.from(header);
+  const secretBuf = Buffer.from(secret);
+  if (headerBuf.length !== secretBuf.length) return false;
+  return crypto.timingSafeEqual(headerBuf, secretBuf);
 }
 
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const force = new URL(request.url).searchParams.get("force") === "1";
-  if (!canRunCron(request, cronSecret)) {
+  if (!hasValidCronSecret(request, cronSecret)) {
     const user = await getSessionUser();
     if (!user || !isAdmin(user.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -101,7 +104,20 @@ export async function POST(request: Request) {
             })
           : [];
 
+      const existingGa4Dates = ga4Metrics.length
+        ? await prisma.metricDaily.findMany({
+            where: {
+              projectId: project.id,
+              source: "GA4",
+              date: { in: ga4Metrics.map((item) => item.date) }
+            },
+            select: { date: true }
+          })
+        : [];
+      const existingGa4Set = new Set(existingGa4Dates.map((row) => row.date.getTime()));
+
       for (const item of ga4Metrics) {
+        const isNew = !existingGa4Set.has(item.date.getTime());
         await prisma.metricDaily.upsert({
           where: {
             projectId_date_source: {
@@ -130,19 +146,48 @@ export async function POST(request: Request) {
             }
           }
         });
+        if (isNew) ga4Inserted += 1;
       }
-      ga4Inserted = ga4Metrics.length;
     } catch (error) {
       projectErrors.push(`GA4: ${error instanceof Error ? error.message : "Ingestion failed"}`);
     }
 
     if (adsIntegration?.refreshToken && adsSource?.externalId) {
       try {
-        const adsMetrics = await fetchAdsDailyMetrics({
-          customerId: adsSource.externalId,
-          refreshToken: adsIntegration.refreshToken
+        const latestAds = await prisma.metricDaily.findFirst({
+          where: { projectId: project.id, source: "ADS" },
+          orderBy: { date: "desc" }
         });
+
+        let adsStartDate = latestAds ? addDays(latestAds.date, 1) : addDays(endDate, -29);
+        if (adsStartDate > endDate) {
+          adsStartDate = endDate;
+        }
+
+        const adsMetrics =
+          adsStartDate <= endDate
+            ? await fetchAdsDailyMetrics({
+                customerId: adsSource.externalId,
+                refreshToken: adsIntegration.refreshToken,
+                startDate: formatDateShort(adsStartDate),
+                endDate: formatDateShort(endDate)
+              })
+            : [];
+
+        const existingAdsDates = adsMetrics.length
+          ? await prisma.metricDaily.findMany({
+              where: {
+                projectId: project.id,
+                source: "ADS",
+                date: { in: adsMetrics.map((item) => item.date) }
+              },
+              select: { date: true }
+            })
+          : [];
+        const existingAdsSet = new Set(existingAdsDates.map((row) => row.date.getTime()));
+
         for (const item of adsMetrics) {
+          const isNew = !existingAdsSet.has(item.date.getTime());
           await prisma.metricDaily.upsert({
             where: {
               projectId_date_source: {
@@ -175,7 +220,7 @@ export async function POST(request: Request) {
               }
             }
           });
-          adsInserted += 1;
+          if (isNew) adsInserted += 1;
         }
       } catch (error) {
         projectErrors.push(`ADS: ${error instanceof Error ? error.message : "Ingestion failed"}`);

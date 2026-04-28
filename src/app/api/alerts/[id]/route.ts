@@ -2,15 +2,21 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
+import { isValidMetric } from "@/lib/metrics-catalog";
+
+const windowUnitEnum = z.enum(["MINUTES", "HOURS", "DAYS", "WEEKS", "MONTHS"]);
+const aggregationEnum = z.enum(["LATEST", "SUM", "AVG"]);
 
 const updateSchema = z.object({
-  metric: z.string().min(1).optional(),
+  metric: z.string().min(1).refine(isValidMetric, "Unknown metric").optional(),
   scope: z.enum(["PROJECT", "CAMPAIGN"]).optional(),
   filter: z.record(z.any()).optional(),
   condition: z.enum(["GT", "LT", "PCT_CHANGE"]).optional(),
   threshold: z.number().optional(),
-  window: z.enum(["TODAY", "YESTERDAY", "LAST_7_DAYS"]).optional(),
-  frequency: z.enum(["DAILY_9AM"]).optional(),
+  windowAmount: z.number().int().min(1).max(365).optional(),
+  windowUnit: windowUnitEnum.optional(),
+  aggregation: aggregationEnum.optional(),
+  evaluateEveryMins: z.number().int().min(5).max(10080).optional(),
   channels: z.record(z.any()).optional(),
   cooldownMins: z.number().int().min(0).optional(),
   enabled: z.boolean().optional()

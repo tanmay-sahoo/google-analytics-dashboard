@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
   name: z.string().min(2).max(80).optional(),
@@ -10,7 +11,16 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const ip = clientIp(request);
+  const limit = rateLimit(`signup:${ip}`, 5, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)) } }
+    );
+  }
+
+  const body = await request.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
 
   if (!parsed.success) {
@@ -20,7 +30,8 @@ export async function POST(request: Request) {
   const { name, email, password } = parsed.data;
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    // Generic success response — prevents enumeration of registered emails.
+    return NextResponse.json({ ok: true });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -28,5 +39,5 @@ export async function POST(request: Request) {
     data: { name, email, passwordHash, role: "USER" }
   });
 
-  return NextResponse.json({ id: user.id, email: user.email });
+  return NextResponse.json({ ok: true, id: user.id });
 }

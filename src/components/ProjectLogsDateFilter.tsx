@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
 import { addDays, formatLocalDate } from "@/lib/time";
@@ -39,22 +38,20 @@ function resolveRangeDates(rangeKey: RangeKey) {
   };
 }
 
-export default function AdsIntelligenceFilters({
-  projects,
-  selectedProjectId,
+export default function ProjectLogsDateFilter({
+  projectId,
+  tab,
   range,
   start,
   end,
-  basePath = "/ads",
   urlHadRange = true,
-  preferenceScope = "ads"
+  preferenceScope = "project-logs"
 }: {
-  projects: { id: string; name: string }[];
-  selectedProjectId: string;
+  projectId: string;
+  tab: string;
   range: RangeKey;
   start: string;
   end: string;
-  basePath?: string;
   urlHadRange?: boolean;
   preferenceScope?: string;
 }) {
@@ -66,12 +63,10 @@ export default function AdsIntelligenceFilters({
   const restoredPreferenceRef = useRef(false);
 
   function pushFilters({
-    projectId,
     rangeKey,
     startDate,
     endDate
   }: {
-    projectId: string;
     rangeKey: RangeKey;
     startDate: string;
     endDate: string;
@@ -82,21 +77,19 @@ export default function AdsIntelligenceFilters({
       end: rangeKey === "custom" ? endDate : undefined
     });
     const params = new URLSearchParams({
-      projectId,
+      tab,
       range: rangeKey,
       start: startDate,
       end: endDate
     });
-    router.push(`${basePath}?${params.toString()}`);
+    router.push(`/projects/${projectId}?${params.toString()}`);
   }
 
   function apply({
-    projectId = selectedProjectId,
     rangeKey = selectedRange,
     startDate = customStart,
     endDate = customEnd
   }: {
-    projectId?: string;
     rangeKey?: RangeKey;
     startDate?: string;
     endDate?: string;
@@ -111,17 +104,11 @@ export default function AdsIntelligenceFilters({
         setError("Start date must be before end date.");
         return;
       }
-      pushFilters({ projectId, rangeKey, startDate, endDate });
+      pushFilters({ rangeKey, startDate, endDate });
       return;
     }
-
     const resolved = resolveRangeDates(rangeKey);
-    pushFilters({
-      projectId,
-      rangeKey,
-      startDate: resolved.start,
-      endDate: resolved.end
-    });
+    pushFilters({ rangeKey, startDate: resolved.start, endDate: resolved.end });
   }
 
   useEffect(() => {
@@ -146,51 +133,34 @@ export default function AdsIntelligenceFilters({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="page-title">Ads Intelligence</h1>
-          <p className="muted">
-            Track CPC, CPM, CTR, CPA, CAC, product spend vs revenue, geo performance, and keyword waste.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <ProjectSelector
-            projects={projects}
-            value={selectedProjectId}
-            onChange={(projectId) => apply({ projectId })}
-            persistKey="mdh:ads:selectedProjectId"
-          />
-          <select
-            className="input max-w-[180px] min-w-[140px]"
-            value={selectedRange}
-            onChange={(event) => {
-              const nextRange = event.target.value as RangeKey;
-              setSelectedRange(nextRange);
-              if (nextRange !== "custom") apply({ rangeKey: nextRange });
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs uppercase tracking-[0.2em] text-slate/50">Date range</span>
+        <select
+          className="input max-w-[180px] min-w-[140px]"
+          value={selectedRange}
+          onChange={(event) => {
+            const nextRange = event.target.value as RangeKey;
+            setSelectedRange(nextRange);
+            if (nextRange !== "custom") apply({ rangeKey: nextRange });
+          }}
+        >
+          {rangeOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {selectedRange === "custom" ? (
+          <DateRangePicker
+            start={customStart}
+            end={customEnd}
+            onChange={(next) => {
+              setCustomStart(next.start);
+              setCustomEnd(next.end);
+              apply({ rangeKey: "custom", startDate: next.start, endDate: next.end });
             }}
-          >
-            {rangeOptions.map((option) => (
-              <option key={option.key} value={option.key}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {selectedRange === "custom" ? (
-            <DateRangePicker
-              start={customStart}
-              end={customEnd}
-              onChange={(next) => {
-                setCustomStart(next.start);
-                setCustomEnd(next.end);
-                apply({
-                  rangeKey: "custom",
-                  startDate: next.start,
-                  endDate: next.end
-                });
-              }}
-            />
-          ) : null}
-        </div>
+          />
+        ) : null}
       </div>
       <FlashMessage message={error} tone="error" onDismiss={() => setError(null)} />
     </div>

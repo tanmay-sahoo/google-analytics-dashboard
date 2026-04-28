@@ -451,31 +451,6 @@ function extractCountryResourceFromRow(row: unknown) {
   return "";
 }
 
-function extractCityResourceFromRow(row: unknown) {
-  const record = asObject(row);
-  const segments = asObject(record.segments);
-  const geographicView = asObject(record.geographicView);
-  const legacyGeographicView = asObject(record.geographic_view);
-  const userLocationView = asObject(record.userLocationView);
-  const legacyUserLocationView = asObject(record.user_location_view);
-
-  const fromSegments = String(
-    pickFirst(segments.geoTargetCity as string | undefined, segments.geo_target_city as string | undefined) ?? ""
-  );
-  if (fromSegments && fromSegments !== "UNSPECIFIED") return fromSegments;
-
-  const criterionId = String(
-    pickFirst(
-      geographicView.cityCriterionId as string | number | undefined,
-      legacyGeographicView.city_criterion_id as string | number | undefined,
-      userLocationView.cityCriterionId as string | number | undefined,
-      legacyUserLocationView.city_criterion_id as string | number | undefined
-    ) ?? ""
-  );
-  if (/^\d+$/.test(criterionId)) return `geoTargetConstants/${criterionId}`;
-  return "";
-}
-
 function aggregateBreakdownRows(rows: AdsBreakdownRow[]) {
   const aggregates = new Map<
     string,
@@ -745,91 +720,15 @@ export async function fetchAdsIntelligence({
     }
   })();
 
-  const locationCities = await (async () => {
-    const { rows, error } = await runAdsSearchStreamFirstSuccess({
-      customerId,
-      refreshToken,
-      queries: [
-        `
-          SELECT
-            segments.geo_target_city,
-            segments.geo_target_country,
-            metrics.impressions,
-            metrics.clicks,
-            metrics.cost_micros,
-            metrics.conversions,
-            metrics.conversions_value
-          FROM campaign
-          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-          ORDER BY metrics.conversions_value DESC
-          LIMIT 300
-        `,
-        `
-          SELECT
-            geographic_view.city_criterion_id,
-            geographic_view.country_criterion_id,
-            metrics.impressions,
-            metrics.clicks,
-            metrics.cost_micros,
-            metrics.conversions,
-            metrics.conversions_value
-          FROM geographic_view
-          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-          ORDER BY metrics.conversions_value DESC
-          LIMIT 300
-        `,
-        `
-          SELECT
-            user_location_view.city_criterion_id,
-            user_location_view.country_criterion_id,
-            metrics.impressions,
-            metrics.clicks,
-            metrics.cost_micros,
-            metrics.conversions,
-            metrics.conversions_value
-          FROM user_location_view
-          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-          ORDER BY metrics.conversions_value DESC
-          LIMIT 300
-        `
-      ]
-    });
-    try {
-      if (!rows.length && error) {
-        throw error;
-      }
-
-      const resources = rows.flatMap((row) => {
-        const city = extractCityResourceFromRow(row);
-        const country = extractCountryResourceFromRow(row);
-        return [city, country];
-      });
-      const names = await resolveGeoNames({ customerId, refreshToken, resources });
-
-      const mapped = rows
-        .map((row) => {
-          const cityResource = extractCityResourceFromRow(row);
-          const countryResource = extractCountryResourceFromRow(row);
-          if (!cityResource || cityResource === "UNSPECIFIED") return null;
-          const city = names.get(cityResource) ?? fallbackGeoLabel(cityResource, "City");
-          const country =
-            names.get(countryResource) ??
-            (countryResource && countryResource !== "UNSPECIFIED"
-              ? fallbackGeoLabel(countryResource, "Country")
-              : "");
-          const label = country ? `${city}, ${country}` : city;
-          return toBreakdownRow(label, extractMetrics(row));
-        })
-        .filter((row): row is AdsBreakdownRow => Boolean(row))
-        .filter((row) => row.spend > 0 || row.conversionValue > 0 || row.clicks > 0);
-      return aggregateBreakdownRows(mapped).slice(0, 300);
-    } catch {
-      warnings.push("City-level location breakdown is unavailable for this account/range.");
-      return [] as AdsBreakdownRow[];
-    }
-  })();
+  // City breakdown is now sourced from GA4 (see fetchGa4CityMetrics) rather than
+  // Google Ads. Keep the field on the result for backwards-compatible types but
+  // return an empty list — Ads doesn't expose user-presence data at city level.
+  const locationCities: AdsBreakdownRow[] = [];
 
   const keywords = await (async () => {
+    let keywordRows: AdsBreakdownRow[] = [];
+    let keywordViewFailed = false;
+
     try {
       const rows = await runAdsSearchStream({
         customerId,
@@ -844,6 +743,7 @@ export async function fetchAdsIntelligence({
             metrics.conversions_value
           FROM keyword_view
           WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            AND metrics.cost_micros > 0
           ORDER BY metrics.cost_micros DESC
           LIMIT 300
         `
@@ -857,16 +757,177 @@ export async function fetchAdsIntelligence({
           const legacyKeyword = asObject(legacyCriterion.keyword);
           const text = String(
             pickFirst(keyword.text as string | undefined, legacyKeyword.text as string | undefined) ??
-              "Unknown keyword"
+              ""
           );
+          if (!text) return null;
           return toBreakdownRow(text, extractMetrics(row));
         })
-        .filter((row) => row.label.length > 0);
-      return aggregateBreakdownRows(mapped).slice(0, 300);
+        .filter((row): row is AdsBreakdownRow => Boolean(row));
+      const aggregated = aggregateBreakdownRows(mapped);
+      keywordRows = aggregated.filter((row) => row.spend > 0).slice(0, 300);
     } catch {
-      warnings.push("Keyword breakdown is unavailable for this account/range.");
-      return [] as AdsBreakdownRow[];
+      keywordViewFailed = true;
     }
+
+    if (keywordRows.length) return keywordRows;
+
+    // Fallback: surface the user's actual search terms when keyword_view has no
+    // data (Performance Max / Display / Shopping accounts have no keywords).
+    try {
+      const rows = await runAdsSearchStream({
+        customerId,
+        refreshToken,
+        query: `
+          SELECT
+            search_term_view.search_term,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.cost_micros,
+            metrics.conversions,
+            metrics.conversions_value
+          FROM search_term_view
+          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+            AND metrics.cost_micros > 0
+          ORDER BY metrics.cost_micros DESC
+          LIMIT 300
+        `
+      });
+
+      const mapped = rows
+        .map((row) => {
+          const view = asObject(asObject(row).searchTermView);
+          const legacy = asObject(asObject(row).search_term_view);
+          const term = String(
+            pickFirst(view.searchTerm as string | undefined, legacy.search_term as string | undefined) ??
+              ""
+          );
+          if (!term) return null;
+          return toBreakdownRow(term, extractMetrics(row));
+        })
+        .filter((row): row is AdsBreakdownRow => Boolean(row));
+      const aggregated = aggregateBreakdownRows(mapped);
+      const filtered = aggregated.filter((row) => row.spend > 0);
+      if (filtered.length) {
+        warnings.push(
+          "No keyword-targeted campaigns in this range — showing top search terms users entered instead."
+        );
+        return filtered.slice(0, 300);
+      }
+    } catch {
+      // continue to PMax fallback
+    }
+
+    // Final fallback: Performance Max / Display / Shopping accounts expose user
+    // search categories via customer_search_term_insight. Google does not expose
+    // cost_micros on this resource, so we query campaign-level spend separately
+    // and distribute it across rows proportionally to clicks (or impressions if
+    // there are no clicks).
+    try {
+      const insightRows = await runAdsSearchStream({
+        customerId,
+        refreshToken,
+        query: `
+          SELECT
+            customer_search_term_insight.category_label,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.conversions,
+            metrics.conversions_value
+          FROM customer_search_term_insight
+          WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+          ORDER BY metrics.impressions DESC
+          LIMIT 300
+        `
+      });
+
+      if (insightRows.length) {
+        type RawRow = {
+          label: string;
+          spend: number;
+          clicks: number;
+          impressions: number;
+          conversions: number;
+          conversionValue: number;
+        };
+        const rawRows: RawRow[] = [];
+        for (const row of insightRows) {
+          const view = asObject(asObject(row).customerSearchTermInsight);
+          const legacy = asObject(asObject(row).customer_search_term_insight);
+          const label = String(
+            pickFirst(
+              view.categoryLabel as string | undefined,
+              legacy.category_label as string | undefined
+            ) ?? ""
+          );
+          if (!label) continue;
+          rawRows.push({ label, ...extractMetrics(row) });
+        }
+
+        // Query total campaign spend for the date range. We only get here when
+        // keyword_view + search_term_view returned no Search-keyword spend, so
+        // the customer's spend in this range is dominated by non-Search channels
+        // (PMax / Display / Shopping) — exactly the campaigns whose data feeds
+        // customer_search_term_insight.
+        let totalChannelSpend = 0;
+        try {
+          const spendRows = await runAdsSearchStream({
+            customerId,
+            refreshToken,
+            query: `
+              SELECT
+                campaign.id,
+                metrics.cost_micros
+              FROM campaign
+              WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
+                AND metrics.cost_micros > 0
+            `
+          });
+          for (const row of spendRows) {
+            const m = asObject(asObject(row).metrics);
+            const cost = parseNumber(
+              pickFirst(m.costMicros as NumericLike, m.cost_micros as NumericLike)
+            );
+            totalChannelSpend += cost / 1_000_000;
+          }
+        } catch {
+          // best-effort — leave totalChannelSpend at 0
+        }
+
+        if (totalChannelSpend > 0 && rawRows.length) {
+          const totalClicks = rawRows.reduce((sum, r) => sum + r.clicks, 0);
+          const totalImpressions = rawRows.reduce((sum, r) => sum + r.impressions, 0);
+          if (totalClicks > 0) {
+            for (const r of rawRows) {
+              r.spend = (r.clicks / totalClicks) * totalChannelSpend;
+            }
+          } else if (totalImpressions > 0) {
+            for (const r of rawRows) {
+              r.spend = (r.impressions / totalImpressions) * totalChannelSpend;
+            }
+          }
+        }
+
+        const mapped = rawRows.map((r) => toBreakdownRow(r.label, r));
+        const aggregated = aggregateBreakdownRows(mapped);
+        const filtered = aggregated.filter(
+          (row) => row.impressions > 0 || row.clicks > 0 || row.conversions > 0
+        );
+        if (filtered.length) {
+          return filtered.slice(0, 300);
+        }
+      }
+    } catch {
+      // ignore — fall through to empty state
+    }
+
+    if (keywordViewFailed) {
+      warnings.push("Keyword breakdown is unavailable for this account/range.");
+    } else {
+      warnings.push(
+        "No keyword or search-term data found for this account in this date range."
+      );
+    }
+    return [] as AdsBreakdownRow[];
   })();
 
   const negativeKeywordCandidates = await (async () => {

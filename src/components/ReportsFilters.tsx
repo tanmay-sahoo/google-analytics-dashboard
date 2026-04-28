@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
-import { addDays, formatDateShort } from "@/lib/time";
+import { addDays, formatLocalDate } from "@/lib/time";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
 import {
@@ -51,8 +51,8 @@ export default function ReportsFilters({
   const [error, setError] = useState<string | null>(null);
   const restoredPreferenceRef = useRef(false);
 
-  function resolveRangeDates(rangeKey: RangeKey, baseEnd: string) {
-    const endDate = baseEnd ? new Date(baseEnd) : new Date();
+  function resolveRangeDates(rangeKey: RangeKey) {
+    const endDate = new Date();
     let startDate = endDate;
     if (rangeKey === "last7") {
       startDate = addDays(endDate, -6);
@@ -64,8 +64,8 @@ export default function ReportsFilters({
       startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
     }
     return {
-      start: formatDateShort(startDate),
-      end: formatDateShort(endDate)
+      start: formatLocalDate(startDate),
+      end: formatLocalDate(endDate)
     };
   }
 
@@ -127,7 +127,7 @@ export default function ReportsFilters({
         return;
       }
     } else {
-      const resolved = resolveRangeDates(selectedRange, end);
+      const resolved = resolveRangeDates(selectedRange);
       nextStart = resolved.start;
       nextEnd = resolved.end;
     }

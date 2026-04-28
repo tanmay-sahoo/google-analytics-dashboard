@@ -3,7 +3,7 @@
 import { useState } from "react";
 import AdminIngestionSettingsClient from "@/components/AdminIngestionSettingsClient";
 import AdminAiSettingsClient from "@/components/AdminAiSettingsClient";
-import AdminDatabaseClient from "@/components/AdminDatabaseClient";
+import AdminSmtpClient from "@/components/AdminSmtpClient";
 
 type IngestionSettings = {
   enabled: boolean;
@@ -12,7 +12,7 @@ type IngestionSettings = {
 };
 
 
-type TabKey = "ingestion" | "ai" | "database";
+type TabKey = "ingestion" | "ai" | "smtp";
 
 export default function AdminSettingsClient({ ingestion }: { ingestion: IngestionSettings }) {
   const [tab, setTab] = useState<TabKey>("ingestion");
@@ -20,7 +20,7 @@ export default function AdminSettingsClient({ ingestion }: { ingestion: Ingestio
   const tabs = [
     { key: "ingestion" as const, label: "Ingestion" },
     { key: "ai" as const, label: "AI config" },
-    { key: "database" as const, label: "Database" }
+    { key: "smtp" as const, label: "Email / SMTP" }
   ];
 
   return (
@@ -50,7 +50,7 @@ export default function AdminSettingsClient({ ingestion }: { ingestion: Ingestio
 
       {tab === "ingestion" ? <AdminIngestionSettingsClient initial={ingestion} /> : null}
       {tab === "ai" ? <AdminAiSettingsClient /> : null}
-      {tab === "database" ? <AdminDatabaseClient /> : null}
+      {tab === "smtp" ? <AdminSmtpClient /> : null}
     </div>
   );
 }

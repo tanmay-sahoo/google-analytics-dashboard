@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(_: Request, context: { params: Promise<{ type: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ type: string }> }) {
   const { type } = await context.params;
   const user = await getSessionUser();
   if (!user || !isAdmin(user.role)) {
@@ -15,5 +15,5 @@ export async function POST(_: Request, context: { params: Promise<{ type: string
 
   await prisma.integrationSetting.delete({ where: { type } }).catch(() => null);
 
-  return NextResponse.redirect(new URL("/admin/integrations", process.env.NEXTAUTH_URL ?? "http://localhost:3000"));
+  return NextResponse.redirect(new URL("/admin/integrations", request.url));
 }

@@ -4,8 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { addDays, formatDateShort } from "@/lib/time";
 import { getOrRefreshReport } from "@/lib/report-cache";
 import { fetchAdsIntelligence, type AdsBreakdownRow, type AdsIntelligenceData } from "@/lib/ads-intelligence";
+import { fetchGa4CityMetrics, type Ga4CityRow } from "@/lib/ga4";
 import AdsIntelligenceFilters from "@/components/AdsIntelligenceFilters";
 import ReportsDataTable from "@/components/ReportsDataTable";
+
+const GA4_CITY_KEY = "locations-city";
 
 type RangeKey = "last7" | "last30" | "last90" | "month" | "custom";
 type FormatType = "number" | "currency";
@@ -97,37 +100,23 @@ const adsDetailMap: Record<string, DetailConfig> = {
     getRows: (data) =>
       toRows(data.locationCountries, (row) => [row.conversionValue, row.spend, row.conversions, row.roas])
   },
-  "locations-city": {
-    title: "City Revenue & Spend",
-    dimensionLabel: "City",
-    columns: [
-      { label: "Revenue", formatType: "currency" },
-      { label: "Spend", formatType: "currency" },
-      { label: "Conversions" },
-      { label: "ROAS" }
-    ],
-    getRows: (data) =>
-      toRows(data.locationCities, (row) => [row.conversionValue, row.spend, row.conversions, row.roas])
-  },
   keywords: {
     title: "Top Keywords",
     dimensionLabel: "Keyword",
     columns: [
-      { label: "Spend", formatType: "currency" },
-      { label: "Revenue", formatType: "currency" },
+      { label: "Impressions" },
       { label: "Clicks" },
+      { label: "Spend", formatType: "currency" },
       { label: "Conversions" },
-      { label: "CPA", formatType: "currency" },
-      { label: "ROAS" }
+      { label: "Revenue", formatType: "currency" }
     ],
     getRows: (data) =>
       toRows(data.keywords, (row) => [
-        row.spend,
-        row.conversionValue,
+        row.impressions,
         row.clicks,
+        row.spend,
         row.conversions,
-        row.cpa,
-        row.roas
+        row.conversionValue
       ])
   },
   "negative-keywords": {
@@ -188,8 +177,9 @@ export default async function AdsDetailPage({
   const user = session?.user;
   if (!user) return null;
 
+  const isGa4CityDetail = resolvedParams.key === GA4_CITY_KEY;
   const detail = adsDetailMap[resolvedParams.key];
-  if (!detail) {
+  if (!detail && !isGa4CityDetail) {
     return <div className="alert">Report not found.</div>;
   }
 
@@ -220,20 +210,49 @@ export default async function AdsDetailPage({
   const forceRefresh = resolvedSearchParams?.refresh === "1";
 
   const adsSource = selectedProject.dataSources.find((item) => item.type === "ADS")?.externalId;
-  const adsIntegration = await prisma.integrationSetting.findUnique({
-    where: { type: "ADS" }
-  });
+  const ga4Source = selectedProject.dataSources.find((item) => item.type === "GA4")?.externalId;
+  const [adsIntegration, ga4Integration] = await Promise.all([
+    prisma.integrationSetting.findUnique({ where: { type: "ADS" } }),
+    prisma.integrationSetting.findUnique({ where: { type: "GA4" } })
+  ]);
 
   let intelligence: AdsIntelligenceData | null = null;
   let errorMessage: string | null = null;
+  let ga4Cities: Ga4CityRow[] = [];
 
-  if (!adsSource || !adsIntegration?.refreshToken) {
+  if (isGa4CityDetail) {
+    if (!ga4Source || !ga4Integration?.refreshToken) {
+      errorMessage = "GA4 is not connected for this project.";
+    } else {
+      try {
+        const cached = await getOrRefreshReport({
+          projectId: selectedProject.id,
+          reportKey: "ga4-cities:v1",
+          rangeStart: start,
+          rangeEnd: end,
+          fetcher: () =>
+            fetchGa4CityMetrics({
+              propertyId: ga4Source,
+              refreshToken: ga4Integration.refreshToken!,
+              startDate: formatDateShort(start),
+              endDate: formatDateShort(end),
+              limit: 1000
+            }),
+          force: forceRefresh
+        });
+        ga4Cities = Array.isArray(cached) ? cached : [];
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        errorMessage = `Failed to fetch GA4 city data. ${message}`;
+      }
+    }
+  } else if (!adsSource || !adsIntegration?.refreshToken) {
     errorMessage = "Google Ads is not connected for this project.";
   } else {
     try {
       intelligence = await getOrRefreshReport({
         projectId: selectedProject.id,
-        reportKey: "ads-intelligence:v3",
+        reportKey: "ads-intelligence:v15",
         rangeStart: start,
         rangeEnd: end,
         fetcher: () =>
@@ -252,7 +271,22 @@ export default async function AdsDetailPage({
   }
 
   intelligence = normalizeAdsData(intelligence);
-  const rows = intelligence ? detail.getRows(intelligence) : [];
+
+  const ga4CityColumns: Array<{ label: string; formatType?: FormatType }> = [
+    { label: "Sessions" },
+    { label: "Users" },
+    { label: "Conversions" },
+    { label: "Revenue", formatType: "currency" }
+  ];
+  const ga4CityRows = ga4Cities.map((row) => ({
+    label: row.label,
+    values: [row.sessions, row.users, row.conversions, row.revenue]
+  }));
+
+  const title = isGa4CityDetail ? "City traffic & revenue (GA4)" : detail!.title;
+  const dimensionLabel = isGa4CityDetail ? "City" : detail!.dimensionLabel;
+  const columns = isGa4CityDetail ? ga4CityColumns : detail!.columns;
+  const rows = isGa4CityDetail ? ga4CityRows : intelligence ? detail!.getRows(intelligence) : [];
 
   return (
     <div className="space-y-6">
@@ -267,16 +301,19 @@ export default async function AdsDetailPage({
 
       <div className="section-header">
         <div>
-          <h2 className="text-lg font-semibold">{detail.title}</h2>
+          <h2 className="text-lg font-semibold">{title}</h2>
           <p className="text-sm text-slate/60">
             {formatDateShort(start)} - {formatDateShort(end)}
           </p>
         </div>
+        {isGa4CityDetail ? (
+          <span className="text-xs text-slate/50">Source: Google Analytics</span>
+        ) : null}
       </div>
 
       {errorMessage ? <div className="alert">{errorMessage}</div> : null}
 
-      {intelligence?.warnings.length ? (
+      {!isGa4CityDetail && intelligence?.warnings.length ? (
         <div className="space-y-2">
           {intelligence.warnings.map((warning) => (
             <div key={warning} className="alert">
@@ -292,10 +329,10 @@ export default async function AdsDetailPage({
 
       {rows.length ? (
         <ReportsDataTable
-          title={detail.title}
-          dimensionLabel={detail.dimensionLabel}
+          title={title}
+          dimensionLabel={dimensionLabel}
           currency={selectedProject.currency}
-          columns={detail.columns}
+          columns={columns}
           rows={rows}
         />
       ) : null}

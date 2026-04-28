@@ -110,7 +110,8 @@ export async function GET() {
   const listData = (await listResponse.json()) as { resourceNames?: string[] };
   const resourceNames = listData.resourceNames ?? [];
   const connectedEmail = integration.connectedEmail ?? undefined;
-  const safeEmail = connectedEmail ? connectedEmail.replace(/'/g, "\\'") : null;
+  const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+  const safeEmail = connectedEmail && EMAIL_RE.test(connectedEmail) ? connectedEmail : null;
 
   const customersMap = new Map<
     string,
@@ -190,7 +191,7 @@ export async function GET() {
           return null;
         }
       }),
-      connectedEmail
+      safeEmail
         ? adsLimiter(async () => {
             try {
               const queryResponse = await runAdsStreamQuery({
@@ -215,7 +216,7 @@ export async function GET() {
     accessRole = accessResult;
 
     if (isManager) continue;
-    if (connectedEmail && accessRole !== "ADMIN") continue;
+    if (safeEmail && accessRole !== "ADMIN") continue;
 
     customersMap.set(customerId, {
       id: customerId,

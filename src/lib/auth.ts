@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 const googleEnabled =
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET;
@@ -20,9 +21,20 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const limit = rateLimit(`signin:${credentials.email.toLowerCase()}`, 10, 60_000);
+        if (!limit.ok) {
+          throw new Error("RateLimited");
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         });
+
+        // Always run a bcrypt compare to keep timing constant whether or not
+        // the user exists — mitigates user-enumeration via response-time signal.
+        const DUMMY_HASH = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8HVc6KQKmFwT7VhB8Cm6tHK6w3I3CG";
+        const compareTarget = user?.passwordHash ?? DUMMY_HASH;
+        const valid = await bcrypt.compare(credentials.password, compareTarget);
 
         if (!user) {
           return null;
@@ -30,12 +42,6 @@ export const authOptions: NextAuthOptions = {
         if (user.isActive === false) {
           throw new Error("AccountInactive");
         }
-
-        const valid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-
         if (!valid) {
           return null;
         }

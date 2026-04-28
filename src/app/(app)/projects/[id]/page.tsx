@@ -2,12 +2,39 @@ import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatDateShort } from "@/lib/time";
+import { addDays, formatDateShort } from "@/lib/time";
 import ProjectDetailClient from "@/components/ProjectDetailClient";
 import Tabs from "@/components/Tabs";
+import PaginatedTable from "@/components/PaginatedTable";
+import ProjectLogsDateFilter from "@/components/ProjectLogsDateFilter";
 
 type ProjectDetailTab = "storage" | "rows" | "ingestion" | "activity";
 const PROJECT_DETAIL_TABS: ProjectDetailTab[] = ["storage", "rows", "ingestion", "activity"];
+
+type LogsRangeKey = "last7" | "last30" | "last90" | "month" | "custom";
+const LOGS_RANGE_KEYS: LogsRangeKey[] = ["last7", "last30", "last90", "month", "custom"];
+
+function resolveLogsRange(range: LogsRangeKey, startParam?: string, endParam?: string) {
+  const end = endParam ? new Date(endParam) : new Date();
+  let start = startParam ? new Date(startParam) : addDays(end, -29);
+  if (range === "last7") start = addDays(end, -6);
+  else if (range === "last30") start = addDays(end, -29);
+  else if (range === "last90") start = addDays(end, -89);
+  else if (range === "month") start = new Date(end.getFullYear(), end.getMonth(), 1);
+  return { start, end };
+}
+
+function endOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
 
 function formatDateTime(value: Date | null | undefined) {
   if (!value) return "-";
@@ -46,7 +73,12 @@ export default async function ProjectDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ tab?: string }>;
+  searchParams?: Promise<{
+    tab?: string;
+    range?: string;
+    start?: string;
+    end?: string;
+  }>;
 }) {
   const resolvedParams = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -75,6 +107,17 @@ export default async function ProjectDetailPage({
     }
   }
 
+  const requestedRange = resolvedSearchParams?.range as LogsRangeKey | undefined;
+  const rangeKey: LogsRangeKey =
+    requestedRange && LOGS_RANGE_KEYS.includes(requestedRange) ? requestedRange : "last30";
+  const { start: rangeStart, end: rangeEnd } = resolveLogsRange(
+    rangeKey,
+    resolvedSearchParams?.start,
+    resolvedSearchParams?.end
+  );
+  const rangeStartDay = startOfDay(rangeStart);
+  const rangeEndDay = endOfDay(rangeEnd);
+
   const [ga4Metrics, adsMetrics] = await Promise.all([
     prisma.metricDaily.groupBy({
       by: ["source"],
@@ -83,9 +126,12 @@ export default async function ProjectDetailPage({
       _max: { date: true, createdAt: true }
     }),
     prisma.metricDaily.findMany({
-      where: { projectId: project.id },
+      where: {
+        projectId: project.id,
+        date: { gte: rangeStartDay, lte: rangeEndDay }
+      },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 40
+      take: 200
     })
   ]);
 
@@ -105,9 +151,12 @@ export default async function ProjectDetailPage({
 
   const [ingestionLogs, activityLogs] = await Promise.all([
     prisma.ingestionProjectLog.findMany({
-      where: { projectId: project.id },
+      where: {
+        projectId: project.id,
+        startedAt: { gte: rangeStartDay, lte: rangeEndDay }
+      },
       orderBy: { startedAt: "desc" },
-      take: 40,
+      take: 200,
       include: {
         run: {
           select: {
@@ -123,10 +172,11 @@ export default async function ProjectDetailPage({
     prisma.activityLog.findMany({
       where: {
         entityId: project.id,
-        entityType: { in: ["METRICS", "DATASOURCE"] }
+        entityType: { in: ["METRICS", "DATASOURCE", "PROJECT"] },
+        createdAt: { gte: rangeStartDay, lte: rangeEndDay }
       },
       orderBy: { createdAt: "desc" },
-      take: 60,
+      take: 200,
       include: { user: { select: { id: true, name: true, email: true } } }
     })
   ]);
@@ -134,7 +184,16 @@ export default async function ProjectDetailPage({
   const requestedTab = resolvedSearchParams?.tab as ProjectDetailTab | undefined;
   const activeTab: ProjectDetailTab =
     requestedTab && PROJECT_DETAIL_TABS.includes(requestedTab) ? requestedTab : "storage";
-  const tabHref = (key: string) => `/projects/${project.id}?tab=${key}`;
+  const filterParams = new URLSearchParams({
+    range: rangeKey,
+    start: formatDateShort(rangeStart),
+    end: formatDateShort(rangeEnd)
+  });
+  const tabHref = (key: string) => {
+    const params = new URLSearchParams(filterParams);
+    params.set("tab", key);
+    return `/projects/${project.id}?${params.toString()}`;
+  };
   const totalStoredRows = ga4Metrics.reduce((acc, item) => acc + item._count._all, 0);
   const tabItems = [
     { key: "storage", label: "Storage summary", count: totalStoredRows },
@@ -161,6 +220,14 @@ export default async function ProjectDetailPage({
       />
 
       <div className="space-y-4">
+        <ProjectLogsDateFilter
+          projectId={project.id}
+          tab={activeTab}
+          range={rangeKey}
+          start={formatDateShort(rangeStart)}
+          end={formatDateShort(rangeEnd)}
+          urlHadRange={Boolean(resolvedSearchParams?.range)}
+        />
         <Tabs
           ariaLabel="Project data tables"
           items={tabItems}
@@ -174,34 +241,21 @@ export default async function ProjectDetailPage({
               <div className="label">Source storage summary</div>
               <p className="text-sm text-slate/60">Latest stored rows per source from your database.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th>Total rows</th>
-                    <th>Last metric date</th>
-                    <th>Last fetched at</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ga4Metrics.length ? (
-                    ga4Metrics.map((item) => (
-                      <tr key={item.source} className="border-t border-slate-100">
-                        <td>{item.source}</td>
-                        <td>{item._count._all}</td>
-                        <td>{item._max.date ? formatDateShort(item._max.date) : "-"}</td>
-                        <td>{formatDateTime(item._max.createdAt)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={4}>No metric rows saved yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <PaginatedTable
+              columns={[
+                { label: "Source" },
+                { label: "Total rows", align: "right" },
+                { label: "Last metric date" },
+                { label: "Last fetched at" }
+              ]}
+              rows={ga4Metrics.map((item) => [
+                item.source,
+                item._count._all.toLocaleString(),
+                item._max.date ? formatDateShort(item._max.date) : "-",
+                formatDateTime(item._max.createdAt)
+              ])}
+              emptyMessage="No metric rows saved yet."
+            />
           </div>
         )}
 
@@ -211,34 +265,23 @@ export default async function ProjectDetailPage({
               <div className="label">Latest fetched data rows</div>
               <p className="text-sm text-slate/60">Recent per-day metric rows persisted for this project.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th>Metric date</th>
-                    <th>Fetched at</th>
-                    <th>Fetched fields</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adsMetrics.length ? (
-                    adsMetrics.map((row) => (
-                      <tr key={row.id} className="border-t border-slate-100">
-                        <td>{row.source}</td>
-                        <td>{formatDateShort(row.date)}</td>
-                        <td>{formatDateTime(row.createdAt)}</td>
-                        <td>{summarizeJson(row.metrics, 6)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={4}>No fetched metric rows yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <PaginatedTable
+              searchable
+              searchPlaceholder="Search source or fields..."
+              columns={[
+                { label: "Source" },
+                { label: "Metric date" },
+                { label: "Fetched at" },
+                { label: "Fetched fields" }
+              ]}
+              rows={adsMetrics.map((row) => [
+                row.source,
+                formatDateShort(row.date),
+                formatDateTime(row.createdAt),
+                summarizeJson(row.metrics, 6)
+              ])}
+              emptyMessage="No fetched metric rows yet."
+            />
           </div>
         )}
 
@@ -248,40 +291,27 @@ export default async function ProjectDetailPage({
               <div className="label">Ingestion fetch logs</div>
               <p className="text-sm text-slate/60">Scheduled/cron ingestion history for this project.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Run started</th>
-                    <th>Run status</th>
-                    <th>Project fetch started</th>
-                    <th>Project fetch finished</th>
-                    <th>GA4 rows</th>
-                    <th>Ads rows</th>
-                    <th>Error</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ingestionLogs.length ? (
-                    ingestionLogs.map((log) => (
-                      <tr key={log.id} className="border-t border-slate-100">
-                        <td>{formatDateTime(log.run.startedAt)}</td>
-                        <td>{log.run.status}</td>
-                        <td>{formatDateTime(log.startedAt)}</td>
-                        <td>{formatDateTime(log.finishedAt)}</td>
-                        <td>{log.ga4Inserted}</td>
-                        <td>{log.adsInserted}</td>
-                        <td>{log.error ?? log.run.error ?? "-"}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={7}>No ingestion logs yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <PaginatedTable
+              columns={[
+                { label: "Run started" },
+                { label: "Run status" },
+                { label: "Project fetch started" },
+                { label: "Project fetch finished" },
+                { label: "GA4 rows", align: "right" },
+                { label: "Ads rows", align: "right" },
+                { label: "Error" }
+              ]}
+              rows={ingestionLogs.map((log) => [
+                formatDateTime(log.run.startedAt),
+                log.run.status,
+                formatDateTime(log.startedAt),
+                formatDateTime(log.finishedAt),
+                log.ga4Inserted,
+                log.adsInserted,
+                log.error ?? log.run.error ?? "-"
+              ])}
+              emptyMessage="No ingestion logs yet."
+            />
           </div>
         )}
 
@@ -291,38 +321,27 @@ export default async function ProjectDetailPage({
               <div className="label">API activity logs</div>
               <p className="text-sm text-slate/60">Manual/source API actions with fetched metadata snapshots.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Entity</th>
-                    <th>Message</th>
-                    <th>Metadata</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activityLogs.length ? (
-                    activityLogs.map((log) => (
-                      <tr key={log.id} className="border-t border-slate-100">
-                        <td>{formatDateTime(log.createdAt)}</td>
-                        <td>{log.user?.name ?? log.user?.email ?? "System"}</td>
-                        <td>{log.action}</td>
-                        <td>{log.entityType}</td>
-                        <td>{log.message ?? "-"}</td>
-                        <td>{summarizeMetadata(log.metadata)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="border-t border-slate-100">
-                      <td colSpan={6}>No API activity logs yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <PaginatedTable
+              searchable
+              searchPlaceholder="Search action, entity, or message..."
+              columns={[
+                { label: "Time" },
+                { label: "User" },
+                { label: "Action" },
+                { label: "Entity" },
+                { label: "Message" },
+                { label: "Metadata" }
+              ]}
+              rows={activityLogs.map((log) => [
+                formatDateTime(log.createdAt),
+                log.user?.name ?? log.user?.email ?? "System",
+                log.action,
+                log.entityType,
+                log.message ?? "-",
+                summarizeMetadata(log.metadata)
+              ])}
+              emptyMessage="No API activity logs yet."
+            />
           </div>
         )}
       </div>

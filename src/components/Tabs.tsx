@@ -8,11 +8,13 @@ export default function Tabs({
   items,
   activeKey,
   buildHref,
+  onSelect,
   ariaLabel
 }: {
   items: TabItem[];
   activeKey: string;
   buildHref: (key: string) => string;
+  onSelect?: (key: string) => void;
   ariaLabel?: string;
 }) {
   return (
@@ -23,18 +25,11 @@ export default function Tabs({
     >
       {items.map((item) => {
         const active = item.key === activeKey;
-        return (
-          <a
-            key={item.key}
-            href={buildHref(item.key)}
-            role="tab"
-            aria-selected={active}
-            className={`relative inline-flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition ${
-              active
-                ? "text-slate"
-                : "text-slate/60 hover:text-slate"
-            }`}
-          >
+        const className = `relative inline-flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-medium transition ${
+          active ? "text-slate" : "text-slate/60 hover:text-slate"
+        }`;
+        const inner = (
+          <>
             <span>{item.label}</span>
             {typeof item.count === "number" ? (
               <span
@@ -51,6 +46,33 @@ export default function Tabs({
                 className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-ocean"
               />
             ) : null}
+          </>
+        );
+
+        if (onSelect) {
+          return (
+            <button
+              type="button"
+              key={item.key}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(item.key)}
+              className={className}
+            >
+              {inner}
+            </button>
+          );
+        }
+
+        return (
+          <a
+            key={item.key}
+            href={buildHref(item.key)}
+            role="tab"
+            aria-selected={active}
+            className={className}
+          >
+            {inner}
           </a>
         );
       })}

@@ -19,6 +19,16 @@ export type Ga4BreakdownRow = {
   revenue: number;
 };
 
+export type Ga4CityRow = {
+  label: string;
+  city: string;
+  country: string;
+  sessions: number;
+  users: number;
+  conversions: number;
+  revenue: number;
+};
+
 export type Ga4TopItem = {
   label: string;
   value: number;
@@ -170,6 +180,67 @@ export async function fetchGa4Breakdowns({
   const devices = await runBreakdown({ propertyId, refreshToken, dimension: "deviceCategory", limit: 10 });
 
   return { campaigns, sources, devices };
+}
+
+export async function fetchGa4CityMetrics({
+  propertyId,
+  refreshToken,
+  startDate,
+  endDate,
+  limit = 300
+}: {
+  propertyId: string;
+  refreshToken: string;
+  startDate: string;
+  endDate: string;
+  limit?: number;
+}): Promise<Ga4CityRow[]> {
+  const response = await runGa4Report({
+    propertyId,
+    refreshToken,
+    requestBody: {
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "city" }, { name: "country" }],
+      metrics: [
+        { name: "sessions" },
+        { name: "totalUsers" },
+        { name: "conversions" },
+        { name: "totalRevenue" }
+      ],
+      orderBys: [{ desc: true, metric: { metricName: "sessions" } }],
+      limit
+    }
+  });
+
+  const rows = response.data.rows ?? [];
+  return rows
+    .map((row) => {
+      const city = row.dimensionValues?.[0]?.value ?? "";
+      const country = row.dimensionValues?.[1]?.value ?? "";
+      const sessions = Number(row.metricValues?.[0]?.value ?? 0);
+      const users = Number(row.metricValues?.[1]?.value ?? 0);
+      const conversions = Number(row.metricValues?.[2]?.value ?? 0);
+      const revenue = Number(row.metricValues?.[3]?.value ?? 0);
+      const trimmedCity = city.trim();
+      const trimmedCountry = country.trim();
+      const isUnknown =
+        !trimmedCity ||
+        trimmedCity === "(not set)" ||
+        trimmedCity.toLowerCase() === "unknown";
+      if (isUnknown) return null;
+      const label = trimmedCountry ? `${trimmedCity}, ${trimmedCountry}` : trimmedCity;
+      return {
+        label,
+        city: trimmedCity,
+        country: trimmedCountry,
+        sessions,
+        users,
+        conversions,
+        revenue
+      };
+    })
+    .filter((row): row is Ga4CityRow => row !== null)
+    .filter((row) => row.sessions > 0 || row.users > 0 || row.revenue > 0);
 }
 
 async function runTopReport({

@@ -9,7 +9,7 @@ export default async function AdminSettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="page-title">Settings</h1>
-        <p className="text-sm text-slate/60">Configure ingestion schedules, AI suggestions, and database visibility.</p>
+        <p className="text-sm text-slate/60">Configure ingestion schedules, AI suggestions, and outbound email.</p>
       </div>
       <AdminSettingsClient
         ingestion={{

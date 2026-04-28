@@ -43,6 +43,10 @@ prisma.$use(async (params, next) => {
     const data = params.args.data as Record<string, unknown>;
     encryptField(data, "apiKey");
   }
+  if (params.model === "SmtpSetting" && params.args?.data) {
+    const data = params.args.data as Record<string, unknown>;
+    encryptField(data, "password");
+  }
   if (params.action === "upsert" && params.args) {
     const create = params.args.create as Record<string, unknown> | undefined;
     const update = params.args.update as Record<string, unknown> | undefined;
@@ -64,6 +68,10 @@ prisma.$use(async (params, next) => {
         encryptField(update, "apiKey");
       }
     }
+    if (params.model === "SmtpSetting") {
+      if (create) encryptField(create, "password");
+      if (update) encryptField(update, "password");
+    }
   }
 
   const result = await next(params);
@@ -82,6 +90,14 @@ prisma.$use(async (params, next) => {
     }
     if (result && typeof result === "object") {
       return decryptRecord(result as Record<string, unknown>, ["apiKey"]);
+    }
+  }
+  if (params.model === "SmtpSetting") {
+    if (Array.isArray(result)) {
+      return result.map((item) => decryptRecord(item as Record<string, unknown>, ["password"]));
+    }
+    if (result && typeof result === "object") {
+      return decryptRecord(result as Record<string, unknown>, ["password"]);
     }
   }
 

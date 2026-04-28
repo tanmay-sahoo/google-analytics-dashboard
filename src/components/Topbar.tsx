@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function Topbar({
   locale,
@@ -50,6 +51,8 @@ export default function Topbar({
         </button>
         <div className="text-lg font-semibold">{t(locale, "appTitle")}</div>
       </div>
+      <div className="flex items-center gap-3">
+      <NotificationBell />
       <button
         className="btn-outline flex items-center gap-2"
         onClick={toggleTheme}
@@ -74,6 +77,7 @@ export default function Topbar({
         )}
         <span className="text-sm">{theme === "light" ? t(locale, "themeLight") : t(locale, "themeDark")}</span>
       </button>
+      </div>
     </header>
   );
 }

@@ -34,20 +34,29 @@ enum AlertScope {
   CAMPAIGN
 }
 
-enum AlertWindow {
-  TODAY
-  YESTERDAY
-  LAST_7_DAYS
+enum AlertWindowUnit {
+  MINUTES
+  HOURS
+  DAYS
+  WEEKS
+  MONTHS
 }
 
-enum AlertFrequency {
-  DAILY_9AM
+enum AlertAggregation {
+  LATEST
+  SUM
+  AVG
 }
 
 enum AlertStatus {
   TRIGGERED
   DELIVERED
   MUTED
+}
+
+enum NotificationKind {
+  ALERT
+  SYSTEM
 }
 
 enum IngestionStatus {
@@ -71,6 +80,7 @@ model User {
   projectUsers ProjectUser[]
   createdRules AlertRule[]  @relation("CreatedRules")
   activityLogs ActivityLog[]
+  notifications Notification[] @relation("UserNotifications")
 
   createdBy    User?        @relation("UserCreator", fields: [createdById], references: [id])
   createdUsers User[]       @relation("UserCreator")
@@ -90,6 +100,7 @@ model Project {
   merchantProducts MerchantProduct[]
   alertRules    AlertRule[]
   alertEvents   AlertEvent[]
+  notifications Notification[] @relation("ProjectNotifications")
 }
 
 model ProjectUser {
@@ -234,6 +245,21 @@ model MerchantAccountImport {
   updatedAt  DateTime @updatedAt
 }
 
+model SmtpSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique @default("default")
+  host      String
+  port      Int
+  secure    Boolean  @default(true)
+  username  String
+  password  String
+  fromEmail String
+  fromName  String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model AiConfig {
   id        String   @id @default(cuid())
   provider  String
@@ -253,11 +279,14 @@ model AlertRule {
   filter           Json?
   condition        AlertCondition
   threshold        Float
-  window           AlertWindow
-  frequency        AlertFrequency
+  windowAmount     Int             @default(1)
+  windowUnit       AlertWindowUnit @default(DAYS)
+  aggregation      AlertAggregation @default(LATEST)
+  evaluateEveryMins Int            @default(60)
   channels         Json
   cooldownMins     Int
   enabled          Boolean         @default(true)
+  lastEvaluatedAt  DateTime?
   createdAt        DateTime        @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -277,4 +306,25 @@ model AlertEvent {
 
   rule    AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String
+  projectId    String?
+  alertEventId String?
+  kind         NotificationKind @default(ALERT)
+  title        String
+  body         String
+  href         String?
+  readAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  user       User        @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  project    Project?    @relation("ProjectNotifications", fields: [projectId], references: [id], onDelete: SetNull)
+  alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }

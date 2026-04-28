@@ -68,13 +68,20 @@ async function getAdsHeaders(refreshToken: string) {
 
 export async function fetchAdsDailyMetrics({
   customerId,
-  refreshToken
+  refreshToken,
+  startDate,
+  endDate
 }: {
   customerId: string;
   refreshToken: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<AdsDailyMetrics[]> {
-  const end = new Date();
-  const start = addDays(end, -29);
+  const end = endDate ? new Date(endDate) : new Date();
+  const start = startDate ? new Date(startDate) : addDays(end, -29);
+  if (start > end) {
+    return [];
+  }
   const apiVersion = process.env.GOOGLE_ADS_API_VERSION ?? "v20";
   const headers = await getAdsHeaders(refreshToken);
   const normalizedCustomerId = cleanCustomerId(customerId);
