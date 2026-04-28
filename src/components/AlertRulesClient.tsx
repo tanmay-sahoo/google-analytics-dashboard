@@ -3,8 +3,12 @@
 import { useMemo, useState } from "react";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
+import { METRICS_CATALOG } from "@/lib/metrics-catalog";
 
 type Project = { id: string; name: string };
+
+type WindowUnit = "MINUTES" | "HOURS" | "DAYS" | "WEEKS" | "MONTHS";
+type Aggregation = "LATEST" | "SUM" | "AVG";
 
 type AlertRule = {
   id: string;
@@ -13,12 +17,28 @@ type AlertRule = {
   scope: string;
   condition: "GT" | "LT" | "PCT_CHANGE";
   threshold: number;
-  window: "TODAY" | "YESTERDAY" | "LAST_7_DAYS";
-  frequency: string;
+  windowAmount: number;
+  windowUnit: WindowUnit;
+  aggregation: Aggregation;
+  evaluateEveryMins: number;
   cooldownMins: number;
   enabled: boolean;
   project: { name: string };
 };
+
+const WINDOW_UNITS: { value: WindowUnit; label: string }[] = [
+  { value: "MINUTES", label: "Minutes" },
+  { value: "HOURS", label: "Hours" },
+  { value: "DAYS", label: "Days" },
+  { value: "WEEKS", label: "Weeks" },
+  { value: "MONTHS", label: "Months" }
+];
+
+const AGGREGATIONS: { value: Aggregation; label: string }[] = [
+  { value: "LATEST", label: "Latest value" },
+  { value: "SUM", label: "Sum over window" },
+  { value: "AVG", label: "Average over window" }
+];
 
 export default function AlertRulesClient({
   projects,
@@ -57,8 +77,10 @@ export default function AlertRulesClient({
       scope: "PROJECT",
       condition: String(formData.get("condition")),
       threshold: Number(formData.get("threshold")),
-      window: String(formData.get("window")),
-      frequency: "DAILY_9AM",
+      windowAmount: Number(formData.get("windowAmount")) || 1,
+      windowUnit: String(formData.get("windowUnit")) as WindowUnit,
+      aggregation: String(formData.get("aggregation")) as Aggregation,
+      evaluateEveryMins: Number(formData.get("evaluateEveryMins")) || 60,
       channels: { email: true, slackWebhook: formData.get("slackWebhook") || null },
       cooldownMins: Number(formData.get("cooldownMins")) || 60,
       enabled: true
@@ -71,7 +93,8 @@ export default function AlertRulesClient({
     });
 
     if (!response.ok) {
-      setMessage("Failed to create alert rule.");
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.error ?? "Failed to create alert rule.");
       setSaving(false);
       return;
     }
@@ -90,7 +113,10 @@ export default function AlertRulesClient({
       metric: String(formData.get("metric")),
       condition: String(formData.get("condition")),
       threshold: Number(formData.get("threshold")),
-      window: String(formData.get("window")),
+      windowAmount: Number(formData.get("windowAmount")) || 1,
+      windowUnit: String(formData.get("windowUnit")) as WindowUnit,
+      aggregation: String(formData.get("aggregation")) as Aggregation,
+      evaluateEveryMins: Number(formData.get("evaluateEveryMins")) || 60,
       cooldownMins: Number(formData.get("cooldownMins")) || 60,
       enabled: String(formData.get("enabled")) === "on"
     };
@@ -102,7 +128,8 @@ export default function AlertRulesClient({
     });
 
     if (!response.ok) {
-      setMessage("Failed to update alert rule.");
+      const data = await response.json().catch(() => ({}));
+      setMessage(data.error ?? "Failed to update alert rule.");
       setSaving(false);
       return;
     }
@@ -147,7 +174,7 @@ export default function AlertRulesClient({
       else if (sortKey === "metric") compare = a.metric.localeCompare(b.metric);
       else if (sortKey === "condition") compare = a.condition.localeCompare(b.condition);
       else if (sortKey === "threshold") compare = a.threshold - b.threshold;
-      else if (sortKey === "window") compare = a.window.localeCompare(b.window);
+      else if (sortKey === "window") compare = a.windowAmount * 1 - b.windowAmount * 1;
       else if (sortKey === "status") compare = Number(a.enabled) - Number(b.enabled);
       else compare = a.id.localeCompare(b.id);
 
@@ -174,29 +201,67 @@ export default function AlertRulesClient({
               </option>
             ))}
           </select>
-          <select name="metric" className="input" required>
-            <option value="spend">Spend</option>
-            <option value="sessions">Sessions</option>
-            <option value="roas">ROAS</option>
+          <select name="metric" className="input" required defaultValue="spend">
+            {METRICS_CATALOG.map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.label}
+              </option>
+            ))}
           </select>
           <select name="condition" className="input" required>
             <option value="GT">&gt; threshold</option>
             <option value="LT">&lt; threshold</option>
             <option value="PCT_CHANGE">% change</option>
           </select>
-          <input name="threshold" type="number" className="input" placeholder="Threshold" required />
-          <select name="window" className="input" required>
-            <option value="TODAY">Today</option>
-            <option value="YESTERDAY">Yesterday</option>
-            <option value="LAST_7_DAYS">Last 7 days</option>
+          <input name="threshold" type="number" step="any" className="input" placeholder="Threshold" required />
+
+          <div className="md:col-span-2 flex items-center gap-2">
+            <input
+              name="windowAmount"
+              type="number"
+              min={1}
+              max={365}
+              className="input flex-1"
+              placeholder="Window amount"
+              defaultValue={1}
+              required
+            />
+            <select name="windowUnit" className="input flex-1" required defaultValue="DAYS">
+              {WINDOW_UNITS.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <select name="aggregation" className="input" defaultValue="LATEST">
+            {AGGREGATIONS.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
           </select>
-          <input name="cooldownMins" type="number" className="input" placeholder="Cooldown (mins)" />
+          <input
+            name="evaluateEveryMins"
+            type="number"
+            min={5}
+            className="input"
+            placeholder="Evaluate every N mins"
+            defaultValue={60}
+          />
+
+          <input name="cooldownMins" type="number" className="input" placeholder="Cooldown (mins)" defaultValue={60} />
           <input name="slackWebhook" className="input" placeholder="Slack webhook (optional)" />
-          <button className="btn-primary" disabled={saving}>
-            {saving ? "Saving..." : "Create"}
-          </button>
+          <div className="md:col-span-2 flex justify-end">
+            <button className="btn-primary" disabled={saving}>
+              {saving ? "Saving..." : "Create"}
+            </button>
+          </div>
         </form>
         <FlashMessage message={message} tone={messageTone} onDismiss={() => setMessage(null)} />
+        <p className="mt-3 text-xs text-slate/60">
+          Sub-day windows (minutes/hours) only produce meaningful alerts if your ingestion runs at least as often as the window.
+        </p>
       </div>
 
       <div className="card">
@@ -246,6 +311,7 @@ export default function AlertRulesClient({
                     onClick={() => toggleSort("window")}
                   />
                 </th>
+                <th>Eval / Agg</th>
                 <th>
                   <SortableHeader
                     label="Status"
@@ -254,14 +320,7 @@ export default function AlertRulesClient({
                     onClick={() => toggleSort("status")}
                   />
                 </th>
-                <th>
-                  <SortableHeader
-                    label="Actions"
-                    active={sortKey === "actions"}
-                    direction={sortDirection}
-                    onClick={() => toggleSort("actions")}
-                  />
-                </th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -271,7 +330,12 @@ export default function AlertRulesClient({
                   <td>{rule.metric}</td>
                   <td>{rule.condition}</td>
                   <td className="text-right">{rule.threshold}</td>
-                  <td>{rule.window}</td>
+                  <td>
+                    {rule.windowAmount} {rule.windowUnit.toLowerCase()}
+                  </td>
+                  <td className="text-xs text-slate/60">
+                    every {rule.evaluateEveryMins}m · {rule.aggregation.toLowerCase()}
+                  </td>
                   <td>{rule.enabled ? "Active" : "Paused"}</td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -308,7 +372,13 @@ export default function AlertRulesClient({
             >
               <label className="space-y-2 text-sm">
                 <div className="text-slate/70">Metric</div>
-                <input name="metric" className="input" defaultValue={editingRule.metric} required />
+                <select name="metric" className="input" defaultValue={editingRule.metric} required>
+                  {METRICS_CATALOG.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="space-y-2 text-sm">
                 <div className="text-slate/70">Condition</div>
@@ -323,18 +393,53 @@ export default function AlertRulesClient({
                 <input
                   name="threshold"
                   type="number"
+                  step="any"
                   className="input"
                   defaultValue={editingRule.threshold}
                   required
                 />
               </label>
               <label className="space-y-2 text-sm">
-                <div className="text-slate/70">Window</div>
-                <select name="window" className="input" defaultValue={editingRule.window} required>
-                  <option value="TODAY">Today</option>
-                  <option value="YESTERDAY">Yesterday</option>
-                  <option value="LAST_7_DAYS">Last 7 days</option>
+                <div className="text-slate/70">Aggregation</div>
+                <select name="aggregation" className="input" defaultValue={editingRule.aggregation}>
+                  {AGGREGATIONS.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
                 </select>
+              </label>
+              <label className="space-y-2 text-sm">
+                <div className="text-slate/70">Window amount</div>
+                <input
+                  name="windowAmount"
+                  type="number"
+                  min={1}
+                  max={365}
+                  className="input"
+                  defaultValue={editingRule.windowAmount}
+                  required
+                />
+              </label>
+              <label className="space-y-2 text-sm">
+                <div className="text-slate/70">Window unit</div>
+                <select name="windowUnit" className="input" defaultValue={editingRule.windowUnit}>
+                  {WINDOW_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm">
+                <div className="text-slate/70">Evaluate every (mins)</div>
+                <input
+                  name="evaluateEveryMins"
+                  type="number"
+                  min={5}
+                  className="input"
+                  defaultValue={editingRule.evaluateEveryMins}
+                />
               </label>
               <label className="space-y-2 text-sm">
                 <div className="text-slate/70">Cooldown (mins)</div>
@@ -385,4 +490,3 @@ export default function AlertRulesClient({
     </div>
   );
 }
-

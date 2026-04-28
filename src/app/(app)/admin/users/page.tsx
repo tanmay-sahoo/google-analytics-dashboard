@@ -11,29 +11,35 @@ export default async function AdminUsersPage() {
     return null;
   }
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      menuAccess: true,
-      createdAt: true,
-      createdBy: { select: { id: true, name: true, email: true } }
-    }
-  });
+  const [users, projects] = await Promise.all([
+    prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        menuAccess: true,
+        createdAt: true,
+        createdBy: { select: { id: true, name: true, email: true } },
+        projectUsers: { select: { projectId: true } }
+      }
+    }),
+    prisma.project.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true }
+    })
+  ]);
 
   const normalizedUsers = users.map((userRow) => ({
     ...userRow,
     menuAccess: Array.isArray(userRow.menuAccess)
       ? userRow.menuAccess.filter((item): item is string => typeof item === "string")
       : null,
-    createdAt: userRow.createdAt.toISOString()
+    createdAt: userRow.createdAt.toISOString(),
+    projectIds: userRow.projectUsers.map((row) => row.projectId)
   }));
 
-  return (
-    <AdminUsersClient initialUsers={normalizedUsers} />
-  );
+  return <AdminUsersClient initialUsers={normalizedUsers} projects={projects} />;
 }

@@ -10,7 +10,8 @@ const updateSchema = z.object({
   role: z.enum(["ADMIN", "USER"]).optional(),
   password: z.string().min(8).optional(),
   isActive: z.boolean().optional(),
-  menuAccess: z.array(z.string()).optional()
+  menuAccess: z.array(z.string()).optional(),
+  projectIds: z.array(z.string().min(1)).optional()
 });
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -46,12 +47,37 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     data
   });
 
+  if (parsed.data.projectIds !== undefined) {
+    const desired = new Set(parsed.data.projectIds);
+    const existing = await prisma.projectUser.findMany({
+      where: { userId: id },
+      select: { projectId: true }
+    });
+    const existingSet = new Set(existing.map((row) => row.projectId));
+
+    const toAdd = parsed.data.projectIds.filter((pid) => !existingSet.has(pid));
+    const toRemove = [...existingSet].filter((pid) => !desired.has(pid));
+
+    if (toRemove.length > 0) {
+      await prisma.projectUser.deleteMany({
+        where: { userId: id, projectId: { in: toRemove } }
+      });
+    }
+    if (toAdd.length > 0) {
+      await prisma.projectUser.createMany({
+        data: toAdd.map((projectId) => ({ projectId, userId: id })),
+        skipDuplicates: true
+      });
+    }
+  }
+
   await logActivity({
     userId: user.id,
     action: "UPDATE",
     entityType: "USER",
     entityId: id,
-    message: "Updated user."
+    message: "Updated user.",
+    metadata: parsed.data.projectIds ? { projectIds: parsed.data.projectIds } : undefined
   });
 
   return NextResponse.json({ ok: true });

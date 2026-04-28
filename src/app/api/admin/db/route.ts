@@ -332,10 +332,13 @@ async function getTableRows(table: TableName, skip: number, take: number) {
           scope: true,
           condition: true,
           threshold: true,
-          window: true,
-          frequency: true,
+          windowAmount: true,
+          windowUnit: true,
+          aggregation: true,
+          evaluateEveryMins: true,
           cooldownMins: true,
           enabled: true,
+          lastEvaluatedAt: true,
           createdAt: true
         }
       })

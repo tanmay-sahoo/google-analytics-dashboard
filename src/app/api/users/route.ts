@@ -11,7 +11,8 @@ const createSchema = z.object({
   password: z.string().min(8),
   role: z.enum(["ADMIN", "USER"]),
   isActive: z.boolean().optional(),
-  menuAccess: z.array(z.string()).optional()
+  menuAccess: z.array(z.string()).optional(),
+  projectIds: z.array(z.string().min(1)).optional()
 });
 
 export async function GET() {
@@ -30,7 +31,8 @@ export async function GET() {
       isActive: true,
       menuAccess: true,
       createdAt: true,
-      createdBy: { select: { id: true, name: true, email: true } }
+      createdBy: { select: { id: true, name: true, email: true } },
+      projectUsers: { select: { projectId: true } }
     }
   });
 
@@ -67,12 +69,20 @@ export async function POST(request: Request) {
     }
   });
 
+  if (parsed.data.projectIds && parsed.data.projectIds.length > 0) {
+    await prisma.projectUser.createMany({
+      data: parsed.data.projectIds.map((projectId) => ({ projectId, userId: created.id })),
+      skipDuplicates: true
+    });
+  }
+
   await logActivity({
     userId: user.id,
     action: "CREATE",
     entityType: "USER",
     entityId: created.id,
-    message: `Created user ${created.email}.`
+    message: `Created user ${created.email}.`,
+    metadata: parsed.data.projectIds?.length ? { projectIds: parsed.data.projectIds } : undefined
   });
 
   return NextResponse.json({ id: created.id });

@@ -40,8 +40,10 @@ export default async function AlertsPage() {
           scope: rule.scope,
           condition: rule.condition,
           threshold: rule.threshold,
-          window: rule.window,
-          frequency: rule.frequency,
+          windowAmount: rule.windowAmount,
+          windowUnit: rule.windowUnit,
+          aggregation: rule.aggregation,
+          evaluateEveryMins: rule.evaluateEveryMins,
           cooldownMins: rule.cooldownMins,
           enabled: rule.enabled,
           project: { name: rule.project.name }

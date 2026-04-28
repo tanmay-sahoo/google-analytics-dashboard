@@ -25,7 +25,7 @@ export default async function AdminAlertsPage() {
           rule.metric,
           rule.condition,
           String(rule.threshold),
-          rule.window,
+          `${rule.windowAmount} ${rule.windowUnit.toLowerCase()}`,
           rule.enabled ? "Active" : "Paused"
         ])}
       />

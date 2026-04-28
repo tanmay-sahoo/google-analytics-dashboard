@@ -13,7 +13,10 @@ type User = {
   menuAccess: string[] | null;
   createdAt?: string;
   createdBy?: { id: string; name: string | null; email: string | null } | null;
+  projectIds?: string[];
 };
+
+type ProjectOption = { id: string; name: string };
 
 type MenuItem = { key: string; label: string };
 
@@ -29,13 +32,21 @@ const MENU_OPTIONS: MenuItem[] = [
   { key: "admin-logs", label: "Admin Logs" }
 ];
 
-export default function AdminUsersClient({ initialUsers }: { initialUsers?: User[] }) {
+export default function AdminUsersClient({
+  initialUsers,
+  projects = []
+}: {
+  initialUsers?: User[];
+  projects?: ProjectOption[];
+}) {
   const [users, setUsers] = useState<User[]>(initialUsers ?? []);
   const [message, setMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [menuAccess, setMenuAccess] = useState<string[]>([]);
+  const [createProjectIds, setCreateProjectIds] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedAccess, setSelectedAccess] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<string>("USER");
   const [selectedActive, setSelectedActive] = useState(true);
   const [createRole, setCreateRole] = useState<string>("USER");
@@ -49,21 +60,29 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
   async function refetch() {
     const response = await fetch("/api/users");
     const data = await response.json();
-    setUsers(Array.isArray(data.users) ? data.users : []);
+    const list: User[] = Array.isArray(data.users)
+      ? data.users.map((row: User & { projectUsers?: { projectId: string }[] }) => ({
+          ...row,
+          projectIds: row.projectUsers?.map((pu) => pu.projectId) ?? row.projectIds ?? []
+        }))
+      : [];
+    setUsers(list);
   }
 
   async function createUser(form: HTMLFormElement) {
     const formData = new FormData(form);
     const effectiveMenus =
       createRole === "ADMIN" ? MENU_OPTIONS.map((item) => item.key) : menuAccess;
-      const payload = {
-        name: String(formData.get("name")),
-        email: String(formData.get("email")),
-        password: String(formData.get("password")),
-        role: createRole,
-        isActive: createActive,
-        menuAccess: effectiveMenus
-      };
+    const effectiveProjects = createRole === "ADMIN" ? [] : createProjectIds;
+    const payload = {
+      name: String(formData.get("name")),
+      email: String(formData.get("email")),
+      password: String(formData.get("password")),
+      role: createRole,
+      isActive: createActive,
+      menuAccess: effectiveMenus,
+      projectIds: effectiveProjects
+    };
 
     const response = await fetch("/api/users", {
       method: "POST",
@@ -76,6 +95,7 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
       setMessage("User created.");
       setShowCreate(false);
       setMenuAccess([]);
+      setCreateProjectIds([]);
       setCreateRole("USER");
       setCreateActive(true);
       form.reset();
@@ -119,6 +139,7 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
   function openUserMenu(user: User) {
     setSelectedUser(user);
     setSelectedAccess(user.menuAccess ?? []);
+    setSelectedProjectIds(user.projectIds ?? []);
     setSelectedRole(user.role);
     setSelectedActive(user.isActive);
   }
@@ -126,6 +147,18 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
   function toggleSelectedAccess(key: string) {
     setSelectedAccess((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+    );
+  }
+
+  function toggleCreateProject(id: string) {
+    setCreateProjectIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  }
+
+  function toggleSelectedProject(id: string) {
+    setSelectedProjectIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
     );
   }
 
@@ -272,6 +305,42 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
                 </div>
               </div>
               <div className="md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate/50">Project access</div>
+                  {projects.length > 0 && createRole !== "ADMIN" ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-ocean hover:underline"
+                      onClick={() =>
+                        setCreateProjectIds(
+                          createProjectIds.length === projects.length ? [] : projects.map((p) => p.id)
+                        )
+                      }
+                    >
+                      {createProjectIds.length === projects.length ? "Clear all" : "Select all"}
+                    </button>
+                  ) : null}
+                </div>
+                {createRole === "ADMIN" ? (
+                  <p className="mt-2 text-xs text-slate/50">Admins automatically have access to all projects.</p>
+                ) : projects.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate/50">No projects yet — create projects first.</p>
+                ) : (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2 max-h-48 overflow-y-auto pr-1">
+                    {projects.map((project) => (
+                      <label key={project.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={createProjectIds.includes(project.id)}
+                          onChange={() => toggleCreateProject(project.id)}
+                        />
+                        {project.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2">
                 <button className="btn-primary">Create</button>
               </div>
             </form>
@@ -349,6 +418,42 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
                 </div>
               </div>
               <div className="md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate/50">Project access</div>
+                  {projects.length > 0 && selectedRole !== "ADMIN" ? (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-ocean hover:underline"
+                      onClick={() =>
+                        setSelectedProjectIds(
+                          selectedProjectIds.length === projects.length ? [] : projects.map((p) => p.id)
+                        )
+                      }
+                    >
+                      {selectedProjectIds.length === projects.length ? "Clear all" : "Select all"}
+                    </button>
+                  ) : null}
+                </div>
+                {selectedRole === "ADMIN" ? (
+                  <p className="mt-2 text-xs text-slate/50">Admins automatically have access to all projects.</p>
+                ) : projects.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate/50">No projects yet.</p>
+                ) : (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2 max-h-48 overflow-y-auto pr-1">
+                    {projects.map((project) => (
+                      <label key={project.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedProjectIds.includes(project.id)}
+                          onChange={() => toggleSelectedProject(project.id)}
+                        />
+                        {project.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="md:col-span-2">
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -379,7 +484,8 @@ export default function AdminUsersClient({ initialUsers }: { initialUsers?: User
                     updateUser(selectedUser.id, {
                       role: selectedRole,
                       isActive: selectedActive,
-                      menuAccess: selectedAccess
+                      menuAccess: selectedAccess,
+                      projectIds: selectedRole === "ADMIN" ? [] : selectedProjectIds
                     })
                   }
                 >

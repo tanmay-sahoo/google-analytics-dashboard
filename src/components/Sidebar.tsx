@@ -61,16 +61,15 @@ export function SidebarContent({
     <>
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-2 text-sm">
         {links.map((item) => {
-          if (item.href.startsWith("/admin") && role !== "ADMIN") {
-            return null;
-          }
-          if (
-            role !== "ADMIN" &&
-            menuAccess &&
-            menuAccess.length > 0 &&
-            !menuAccess.includes(item.key)
-          ) {
-            return null;
+          if (role !== "ADMIN") {
+            const isAdminPath = item.href.startsWith("/admin");
+            if (isAdminPath) {
+              // Admin-area links require explicit menuAccess.
+              if (!menuAccess || !menuAccess.includes(item.key)) return null;
+            } else if (menuAccess && menuAccess.length > 0 && !menuAccess.includes(item.key)) {
+              // Non-admin links: respect explicit menuAccess if set.
+              return null;
+            }
           }
 
           const Icon = item.icon;
