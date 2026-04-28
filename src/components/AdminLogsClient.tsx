@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import SortableHeader from "@/components/SortableHeader";
+import StatusBadge from "@/components/StatusBadge";
 
 type ActivityItem = {
   id: string;
@@ -60,7 +61,7 @@ export default function AdminLogsClient({
   >("started");
   const [runsSortDirection, setRunsSortDirection] = useState<"asc" | "desc">("desc");
   const [projectsSortKey, setProjectsSortKey] = useState<
-    "project" | "run" | "started" | "finished" | "ga4" | "ads" | "error"
+    "project" | "run" | "started" | "finished" | "status" | "ga4" | "ads" | "error"
   >("started");
   const [projectsSortDirection, setProjectsSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -95,7 +96,7 @@ export default function AdminLogsClient({
   }
 
   function toggleProjectsSort(
-    key: "project" | "run" | "started" | "finished" | "ga4" | "ads" | "error"
+    key: "project" | "run" | "started" | "finished" | "status" | "ga4" | "ads" | "error"
   ) {
     if (projectsSortKey === key) {
       setProjectsSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -169,11 +170,15 @@ export default function AdminLogsClient({
       const aError = (a.error ?? "").toLowerCase();
       const bError = (b.error ?? "").toLowerCase();
 
+      const aStatus = a.error ? "FAILED" : a.finishedAt ? "COMPLETED" : "RUNNING";
+      const bStatus = b.error ? "FAILED" : b.finishedAt ? "COMPLETED" : "RUNNING";
+
       let compare = 0;
       if (projectsSortKey === "project") compare = a.projectName.localeCompare(b.projectName);
       else if (projectsSortKey === "run") compare = aRun.localeCompare(bRun);
       else if (projectsSortKey === "started") compare = aStarted - bStarted;
       else if (projectsSortKey === "finished") compare = aFinished - bFinished;
+      else if (projectsSortKey === "status") compare = aStatus.localeCompare(bStatus);
       else if (projectsSortKey === "ga4") compare = a.ga4Inserted - b.ga4Inserted;
       else if (projectsSortKey === "ads") compare = a.adsInserted - b.adsInserted;
       else compare = aError.localeCompare(bError);
@@ -261,7 +266,7 @@ export default function AdminLogsClient({
                   <td>{formatDate(item.createdAt)}</td>
                   <td>{item.user?.name ?? item.user?.email ?? "System"}</td>
                   <td>
-                    <span className="chip">{item.action}</span>
+                    <StatusBadge label={item.action} />
                   </td>
                   <td>
                     {item.entityType}
@@ -347,7 +352,7 @@ export default function AdminLogsClient({
                   <td>{formatDate(run.startedAt)}</td>
                   <td>{formatDate(run.finishedAt)}</td>
                   <td>
-                    <span className="chip">{run.status}</span>
+                    <StatusBadge label={run.status} />
                   </td>
                   <td>{run.totalProjects}</td>
                   <td>{run.totalGa4}</td>
@@ -399,6 +404,14 @@ export default function AdminLogsClient({
                 </th>
                 <th>
                   <SortableHeader
+                    label="Status"
+                    active={projectsSortKey === "status"}
+                    direction={projectsSortDirection}
+                    onClick={() => toggleProjectsSort("status")}
+                  />
+                </th>
+                <th>
+                  <SortableHeader
                     label="GA4 Rows"
                     active={projectsSortKey === "ga4"}
                     direction={projectsSortDirection}
@@ -426,17 +439,23 @@ export default function AdminLogsClient({
               </tr>
             </thead>
             <tbody>
-              {sortedProjectLogs.map((log) => (
-                <tr key={log.id} className="border-t border-slate-100">
-                  <td>{log.projectName}</td>
-                  <td>{formatDate(runMap.get(log.runId)?.startedAt ?? null)}</td>
-                  <td>{formatDate(log.startedAt)}</td>
-                  <td>{formatDate(log.finishedAt)}</td>
-                  <td>{log.ga4Inserted}</td>
-                  <td>{log.adsInserted}</td>
-                  <td>{log.error ?? "-"}</td>
-                </tr>
-              ))}
+              {sortedProjectLogs.map((log) => {
+                const status = log.error ? "FAILED" : log.finishedAt ? "COMPLETED" : "RUNNING";
+                return (
+                  <tr key={log.id} className="border-t border-slate-100">
+                    <td>{log.projectName}</td>
+                    <td>{formatDate(runMap.get(log.runId)?.startedAt ?? null)}</td>
+                    <td>{formatDate(log.startedAt)}</td>
+                    <td>{formatDate(log.finishedAt)}</td>
+                    <td>
+                      <StatusBadge label={status} />
+                    </td>
+                    <td>{log.ga4Inserted}</td>
+                    <td>{log.adsInserted}</td>
+                    <td>{log.error ?? "-"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

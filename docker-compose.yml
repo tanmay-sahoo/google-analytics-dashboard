@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketing_data_hub}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-marketing_data_hub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Expose only on the host loopback if you need direct DB access. Comment out otherwise.
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-marketing_data_hub}?schema=public
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3002}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3002}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3002/api/integrations/google/callback}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      GOOGLE_ADS_MANAGER_CUSTOMER_ID: ${GOOGLE_ADS_MANAGER_CUSTOMER_ID:-}
+      GOOGLE_ADS_API_VERSION: ${GOOGLE_ADS_API_VERSION:-v20}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

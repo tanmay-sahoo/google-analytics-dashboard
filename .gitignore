@@ -15,3 +15,13 @@ build/
 coverage/
 *.tsbuildinfo
 .claude
+
+# Docker - local overrides and generated artifacts
+docker-compose.override.yml
+docker-compose.*.local.yml
+compose.override.yml
+.docker/
+.dockerignore.local
+docker-data/
+pgdata/
+postgres-data/
