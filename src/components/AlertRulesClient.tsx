@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 import StatusBadge from "@/components/StatusBadge";
+import EmptyState from "@/components/EmptyState";
 import { METRICS_CATALOG } from "@/lib/metrics-catalog";
 
 type Project = { id: string; name: string };
@@ -324,8 +325,11 @@ export default function AlertRulesClient({
             <tbody>
               {sortedRules.length === 0 ? (
                 <tr className="border-t border-slate-100">
-                  <td colSpan={8} className="py-8 text-center text-sm text-slate/60">
-                    No alert rules yet. Click &ldquo;Create alert&rdquo; to add one.
+                  <td colSpan={8} className="py-2">
+                    <EmptyState
+                      title="No alert rules yet"
+                      description='Click "Create alert" to add your first rule.'
+                    />
                   </td>
                 </tr>
               ) : (

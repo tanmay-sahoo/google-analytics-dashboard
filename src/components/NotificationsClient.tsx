@@ -5,6 +5,7 @@ import Link from "next/link";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 import StatusBadge from "@/components/StatusBadge";
+import EmptyState from "@/components/EmptyState";
 
 type ProjectOption = { id: string; name: string };
 
@@ -278,8 +279,11 @@ export default function NotificationsClient({
             <tbody>
               {sortedItems.length === 0 ? (
                 <tr className="border-t border-slate-100">
-                  <td colSpan={isAdminScope ? 8 : 7} className="py-8 text-center text-sm text-slate/60">
-                    No notifications match the current filters.
+                  <td colSpan={isAdminScope ? 8 : 7} className="py-2">
+                    <EmptyState
+                      title={loading ? "Loading…" : "No notifications match the current filters"}
+                      description={loading ? undefined : "Try clearing filters or check back later."}
+                    />
                   </td>
                 </tr>
               ) : (

@@ -23,7 +23,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3002:3002"
+      - "127.0.01:3002:3002"
     environment:
       NODE_ENV: production
       PORT: 3002
@@ -46,6 +46,8 @@ services:
       GA4_REPORT_CACHE_TTL_SEC: ${GA4_REPORT_CACHE_TTL_SEC:-300}
       GA4_REALTIME_CACHE_TTL_SEC: ${GA4_REALTIME_CACHE_TTL_SEC:-30}
       ADS_REPORT_CACHE_TTL_SEC: ${ADS_REPORT_CACHE_TTL_SEC:-300}
+      # How long an "active" (current-period) DB snapshot is reused before refetching from Google.
+      REPORT_SNAPSHOT_FRESH_TTL_SEC: ${REPORT_SNAPSHOT_FRESH_TTL_SEC:-900}
     depends_on:
       db:
         condition: service_healthy

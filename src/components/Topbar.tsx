@@ -35,7 +35,7 @@ export default function Topbar({
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200/70 bg-white/80 px-6 py-4">
+    <header className="glass sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/70 bg-white/70 px-6 py-4">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -49,7 +49,7 @@ export default function Topbar({
             <path d="M4 18h16" />
           </svg>
         </button>
-        <div className="text-lg font-semibold">{t(locale, "appTitle")}</div>
+        <div className="text-lg font-semibold tracking-tight">{t(locale, "appTitle")}</div>
       </div>
       <div className="flex items-center gap-3">
       <NotificationBell />

@@ -4,7 +4,13 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import Sparkline from "@/components/Sparkline";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import EmptyState from "@/components/EmptyState";
+import {
+  KPIGridSkeleton,
+  ChartCardSkeleton,
+  BarListSkeleton
+} from "@/components/skeletons";
+import Skeleton from "@/components/Skeleton";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import {
   readDateRangePreference,
@@ -142,7 +148,7 @@ function BarList({
             </div>
           ))
         ) : (
-          <p className="text-sm text-slate/50">No data yet.</p>
+          <EmptyState title="No data yet." compact />
         )}
       </div>
     </div>
@@ -245,7 +251,10 @@ export default function DashboardClient({
   initialDashboard: DashboardPayload | null;
 }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(initialDashboard);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [coreLoading, setCoreLoading] = useState(false);
+  const [realtimeLoading, setRealtimeLoading] = useState(false);
+  const [highlightsLoading, setHighlightsLoading] = useState(false);
+  const [coreError, setCoreError] = useState<string | null>(null);
   const [activeMetric, setActiveMetric] = useState<MetricKey>("sessions");
   const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? "");
   const [range, setRange] = useState<RangeKey>("last30");
@@ -260,18 +269,37 @@ export default function DashboardClient({
     if (restoredPreferenceRef.current) return;
     restoredPreferenceRef.current = true;
     const saved = readDateRangePreference("dashboard");
-    if (!saved) return;
-    setRange(saved.range);
-    if (saved.range === "custom" && saved.start && saved.end) {
-      setCustomStart(saved.start);
-      setCustomEnd(saved.end);
-      void applyRange({
-        rangeOverride: "custom",
-        customStartOverride: saved.start,
-        customEndOverride: saved.end
-      });
-    } else if (saved.range !== "last30") {
-      void applyRange({ rangeOverride: saved.range });
+    if (saved) {
+      setRange(saved.range);
+      if (saved.range === "custom" && saved.start && saved.end) {
+        setCustomStart(saved.start);
+        setCustomEnd(saved.end);
+        void applyRange({
+          rangeOverride: "custom",
+          customStartOverride: saved.start,
+          customEndOverride: saved.end
+        });
+        return;
+      }
+      if (saved.range !== "last30") {
+        void applyRange({ rangeOverride: saved.range });
+        return;
+      }
+    }
+    // Default first render: KPIs/trend and realtime come pre-populated from the
+    // server, but highlights are not pre-fetched. Stream them in independently.
+    if (selectedProjectId && initialDashboard) {
+      const { start, end } = resolveRange("last30");
+      setHighlightsLoading(true);
+      const params = new URLSearchParams({ projectId: selectedProjectId, start, end });
+      void fetch(`/api/metrics/dashboard/highlights?${params.toString()}`)
+        .then(async (response) => {
+          if (!response.ok) return;
+          const data = (await response.json()) as DashboardPayload["highlights"];
+          setDashboard((prev) => (prev ? { ...prev, highlights: data } : prev));
+        })
+        .catch(() => {})
+        .finally(() => setHighlightsLoading(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -295,7 +323,6 @@ export default function DashboardClient({
     const effectiveCustomEnd = customEndOverride ?? customEnd;
     const effectiveCompare = compareOverride ?? compare;
     if (!projectId) return;
-    setStatus("loading");
     setFilterError(null);
     let start = "";
     let end = "";
@@ -304,12 +331,10 @@ export default function DashboardClient({
       end = effectiveCustomEnd;
       if (!start || !end) {
         setFilterError("Select both start and end dates.");
-        setStatus("idle");
         return;
       }
       if (new Date(start) > new Date(end)) {
         setFilterError("Start date must be before end date.");
-        setStatus("idle");
         return;
       }
     } else {
@@ -322,23 +347,98 @@ export default function DashboardClient({
       start: effectiveRange === "custom" ? start : undefined,
       end: effectiveRange === "custom" ? end : undefined
     });
-    const params = new URLSearchParams({
-      projectId,
-      start,
-      end,
-      compare: effectiveCompare ? "previous" : ""
-    });
-    if (!effectiveCompare) {
-      params.delete("compare");
-    }
-    const response = await fetch(`/api/metrics/dashboard?${params.toString()}`);
-    if (response.ok) {
-      const data = await response.json();
-      setDashboard(data);
-      setStatus("idle");
-      return;
-    }
-    setStatus("error");
+    const baseParams: Record<string, string> = { projectId, start, end };
+    const coreParams = new URLSearchParams(baseParams);
+    if (effectiveCompare) coreParams.set("compare", "previous");
+    const realtimeParams = new URLSearchParams({ projectId });
+    const highlightsParams = new URLSearchParams(baseParams);
+
+    setCoreLoading(true);
+    setRealtimeLoading(true);
+    setHighlightsLoading(true);
+    setCoreError(null);
+
+    // Fire all three in parallel — each section reveals as soon as its slice arrives.
+    const corePromise = fetch(`/api/metrics/dashboard/core?${coreParams.toString()}`);
+    const realtimePromise = fetch(`/api/metrics/dashboard/realtime?${realtimeParams.toString()}`);
+    const highlightsPromise = fetch(`/api/metrics/dashboard/highlights?${highlightsParams.toString()}`);
+
+    void corePromise
+      .then(async (response) => {
+        if (!response.ok) {
+          setCoreError("Failed to load metrics. Try again.");
+          return;
+        }
+        const data = (await response.json()) as Pick<
+          DashboardPayload,
+          "currency" | "kpis" | "trend" | "compare"
+        >;
+        setDashboard((prev) => ({
+          currency: data.currency,
+          kpis: data.kpis,
+          trend: data.trend,
+          realtime: prev?.realtime ?? { activeUsers: 0, countries: [] },
+          highlights:
+            prev?.highlights ?? {
+              events: [],
+              sources: [],
+              landingPages: [],
+              userAcquisition: [],
+              sessionAcquisition: [],
+              countries: []
+            },
+          compare: data.compare
+        }));
+      })
+      .catch(() => setCoreError("Failed to load metrics. Try again."))
+      .finally(() => setCoreLoading(false));
+
+    void realtimePromise
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as DashboardPayload["realtime"];
+        setDashboard((prev) =>
+          prev
+            ? { ...prev, realtime: data }
+            : {
+                currency: "INR",
+                kpis: { users: 0, sessions: 0, conversions: 0, revenue: 0 },
+                trend: { dates: [], users: [], sessions: [], conversions: [], revenue: [] },
+                realtime: data,
+                highlights: {
+                  events: [],
+                  sources: [],
+                  landingPages: [],
+                  userAcquisition: [],
+                  sessionAcquisition: [],
+                  countries: []
+                },
+                compare: null
+              }
+        );
+      })
+      .catch(() => {})
+      .finally(() => setRealtimeLoading(false));
+
+    void highlightsPromise
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as DashboardPayload["highlights"];
+        setDashboard((prev) =>
+          prev
+            ? { ...prev, highlights: data }
+            : {
+                currency: "INR",
+                kpis: { users: 0, sessions: 0, conversions: 0, revenue: 0 },
+                trend: { dates: [], users: [], sessions: [], conversions: [], revenue: [] },
+                realtime: { activeUsers: 0, countries: [] },
+                highlights: data,
+                compare: null
+              }
+        );
+      })
+      .catch(() => {})
+      .finally(() => setHighlightsLoading(false));
   };
 
   async function handleChange(projectId: string) {
@@ -456,19 +556,14 @@ export default function DashboardClient({
       </div>
 
       <FlashMessage message={filterError} tone="error" onDismiss={() => setFilterError(null)} />
-      <FlashMessage
-        message={status === "error" ? "Failed to load dashboard data. Try again." : null}
-        tone="error"
-      />
+      <FlashMessage message={coreError} tone="error" onDismiss={() => setCoreError(null)} />
 
-      {status === "loading" ? (
-        <div aria-busy="true" aria-live="polite">
-          <DashboardSkeleton />
-        </div>
-      ) : (
       <div className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="card space-y-6">
+        <div className="card space-y-6" aria-busy={coreLoading || undefined}>
+          {coreLoading ? (
+            <KPIGridSkeleton count={4} columnsClass="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" />
+          ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {metricOptions.map((metric) => {
               const isActive = metric.key === activeMetric;
@@ -515,32 +610,51 @@ export default function DashboardClient({
               );
             })}
           </div>
+          )}
 
-          <div className="rounded-2xl border border-slate/10 bg-white/80 p-4">
-            {trendPoints.length > 0 ? (
-            <TrendArea points={trendPoints} dates={trendDates} formatValue={formatTrendValue} />
-            ) : (
-              <div className="flex h-48 items-center justify-center text-sm text-slate/50">
-                No GA4 trend data yet.
+          {coreLoading ? (
+            <ChartCardSkeleton height={224} />
+          ) : (
+            <div className="rounded-2xl border border-slate/10 bg-white/80 p-4">
+              {trendPoints.length > 0 ? (
+                <TrendArea points={trendPoints} dates={trendDates} formatValue={formatTrendValue} />
+              ) : (
+                <EmptyState title="No GA4 trend data yet." compact />
+              )}
+              <div className="mt-3 flex items-center justify-between text-xs text-slate/50">
+                <span>{rangeText}</span>
+                <span>{rangeLabel}</span>
               </div>
-            )}
-            <div className="mt-3 flex items-center justify-between text-xs text-slate/50">
-              <span>{rangeText}</span>
-              <span>{rangeLabel}</span>
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="card space-y-4">
+        <div className="card space-y-4" aria-busy={realtimeLoading || undefined}>
           <div>
             <p className="label">Active users in last 30 minutes</p>
-            <p className="mt-2 text-4xl font-semibold">
-              {formatNumber(dashboard?.realtime.activeUsers ?? 0)}
-            </p>
+            {realtimeLoading ? (
+              <div className="mt-2"><Skeleton width={96} height={36} rounded="lg" /></div>
+            ) : (
+              <p className="mt-2 text-4xl font-semibold">
+                {formatNumber(dashboard?.realtime.activeUsers ?? 0)}
+              </p>
+            )}
           </div>
           <div className="space-y-3">
             <p className="text-xs uppercase tracking-[0.2em] text-slate/50">Top countries</p>
-            {dashboard?.realtime.countries.length ? (
+            {realtimeLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Skeleton width={`${50 + ((index * 11) % 30)}%`} height={12} />
+                      <Skeleton width={32} height={12} />
+                    </div>
+                    <Skeleton height={6} rounded="full" />
+                  </div>
+                ))}
+              </div>
+            ) : dashboard?.realtime.countries.length ? (
               dashboard.realtime.countries.map((item) => (
                 <div key={item.label} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
@@ -561,95 +675,123 @@ export default function DashboardClient({
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate/50">No realtime activity yet.</p>
+              <EmptyState title="No realtime activity yet." compact />
             )}
           </div>
         </div>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <p className="label">Top events</p>
-            <span className="text-xs text-slate/50">Event count</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {dashboard?.highlights.events.length ? (
-              dashboard.highlights.events.map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-sm">
-                  <span className="truncate pr-2">{item.label}</span>
-                  <span className="text-slate/60">{formatNumber(item.value)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate/50">No events yet.</p>
-            )}
-          </div>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy={highlightsLoading || undefined}>
+        {highlightsLoading ? (
+          <>
+            <BarListSkeleton rows={5} />
+            <BarListSkeleton rows={5} />
+            <BarListSkeleton rows={5} />
+          </>
+        ) : (
+          <>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <p className="label">Top events</p>
+                <span className="text-xs text-slate/50">Event count</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {dashboard?.highlights.events.length ? (
+                  dashboard.highlights.events.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-sm">
+                      <span className="truncate pr-2">{item.label}</span>
+                      <span className="text-slate/60">{formatNumber(item.value)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState title="No events yet." compact />
+                )}
+              </div>
+            </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <p className="label">Traffic acquisition</p>
-            <span className="text-xs text-slate/50">Sessions</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {dashboard?.highlights.sources.length ? (
-              dashboard.highlights.sources.map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-sm">
-                  <span className="truncate pr-2">{item.label}</span>
-                  <span className="text-slate/60">{formatNumber(item.value)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate/50">No traffic data yet.</p>
-            )}
-          </div>
-        </div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <p className="label">Traffic acquisition</p>
+                <span className="text-xs text-slate/50">Sessions</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {dashboard?.highlights.sources.length ? (
+                  dashboard.highlights.sources.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-sm">
+                      <span className="truncate pr-2">{item.label}</span>
+                      <span className="text-slate/60">{formatNumber(item.value)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState title="No traffic data yet." compact />
+                )}
+              </div>
+            </div>
 
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <p className="label">Landing pages</p>
-            <span className="text-xs text-slate/50">Views</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {dashboard?.highlights.landingPages.length ? (
-              dashboard.highlights.landingPages.map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-sm">
-                  <span className="truncate pr-2">{item.label}</span>
-                  <span className="text-slate/60">{formatNumber(item.value)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate/50">No landing page data yet.</p>
-            )}
-          </div>
-        </div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <p className="label">Landing pages</p>
+                <span className="text-xs text-slate/50">Views</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {dashboard?.highlights.landingPages.length ? (
+                  dashboard.highlights.landingPages.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-sm">
+                      <span className="truncate pr-2">{item.label}</span>
+                      <span className="text-slate/60">{formatNumber(item.value)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState title="No landing page data yet." compact />
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <BarList
-          title="New users by channel"
-          metricLabel="New users"
-          items={dashboard?.highlights.userAcquisition ?? []}
-        />
-        <BarList
-          title="Sessions by channel"
-          metricLabel="Sessions"
-          items={dashboard?.highlights.sessionAcquisition ?? []}
-        />
+      <section className="grid gap-4 md:grid-cols-2" aria-busy={highlightsLoading || undefined}>
+        {highlightsLoading ? (
+          <>
+            <BarListSkeleton rows={5} />
+            <BarListSkeleton rows={5} />
+          </>
+        ) : (
+          <>
+            <BarList
+              title="New users by channel"
+              metricLabel="New users"
+              items={dashboard?.highlights.userAcquisition ?? []}
+            />
+            <BarList
+              title="Sessions by channel"
+              metricLabel="Sessions"
+              items={dashboard?.highlights.sessionAcquisition ?? []}
+            />
+          </>
+        )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <BarList
-          title="Active users by country"
-          metricLabel="Active users"
-          items={dashboard?.highlights.countries ?? []}
-        />
-        <BarList
-          title="Traffic acquisition"
-          metricLabel="Sessions"
-          items={dashboard?.highlights.sources ?? []}
-        />
+      <section className="grid gap-4 md:grid-cols-2" aria-busy={highlightsLoading || undefined}>
+        {highlightsLoading ? (
+          <>
+            <BarListSkeleton rows={5} />
+            <BarListSkeleton rows={5} />
+          </>
+        ) : (
+          <>
+            <BarList
+              title="Active users by country"
+              metricLabel="Active users"
+              items={dashboard?.highlights.countries ?? []}
+            />
+            <BarList
+              title="Traffic acquisition"
+              metricLabel="Sessions"
+              items={dashboard?.highlights.sources ?? []}
+            />
+          </>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -670,7 +812,6 @@ export default function DashboardClient({
         </div>
       </section>
       </div>
-      )}
     </div>
   );
 }

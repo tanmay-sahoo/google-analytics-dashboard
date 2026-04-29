@@ -11,6 +11,7 @@ export default function AppShell({
   email,
   locale,
   theme,
+  logoUrl,
   children
 }: {
   role?: string;
@@ -19,6 +20,7 @@ export default function AppShell({
   email?: string | null;
   locale?: string;
   theme?: "light" | "dark";
+  logoUrl?: string | null;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -39,6 +41,7 @@ export default function AppShell({
           locale={locale}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((value) => !value)}
+          logoUrl={logoUrl}
         />
         <div className="flex flex-1 flex-col">
           <Topbar locale={locale} theme={theme} onMenuClick={() => setMobileOpen(true)} />
