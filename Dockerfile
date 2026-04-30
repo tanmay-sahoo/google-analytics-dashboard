@@ -15,6 +15,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Build-time DATABASE_URL is only used to satisfy Prisma's env() validation
+# during `next build` static-page tracing. It is NOT used at runtime — the real
+# DATABASE_URL comes from the runtime environment (docker-compose .env).
+ARG DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
+ENV DATABASE_URL=${DATABASE_URL}
 RUN npx prisma generate && npm run build
 
 # ---- runner stage: minimal runtime image ----
