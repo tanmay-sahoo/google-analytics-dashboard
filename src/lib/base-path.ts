@@ -1,7 +1,8 @@
-// Single source of truth for the app's URL prefix. Must match the
-// `basePath` value in next.config.js. Used by client-side fetch calls
-// (which Next does NOT auto-prefix) and by NextAuth's SessionProvider.
-export const BASE_PATH = "/analytics-app";
+// Single source of truth for the app's URL prefix at runtime. The value comes
+// from `basepath.config.js` at the project root (read by next.config.js and
+// exposed as process.env.NEXT_PUBLIC_BASE_PATH). When the config file is
+// missing or empty, BASE_PATH is "" and the app is served at the root.
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export function apiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;

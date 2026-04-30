@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-// Keep this in sync with `basePath` in next.config.js and BASE_PATH in
-// src/lib/base-path.ts. middleware.ts lives outside src/ so the @/-alias
-// import doesn't resolve here.
-const BASE_PATH = "/analytics-app";
+// Resolved at build time from basepath.config.js by next.config.js's `env`
+// field. Empty string when the config file is missing — middleware redirects
+// then go to plain "/signin", "/dashboard", etc.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 // Build a redirect URL that respects the app's basePath. NextResponse.redirect
 // is a low-level primitive — it does NOT auto-prepend basePath like
