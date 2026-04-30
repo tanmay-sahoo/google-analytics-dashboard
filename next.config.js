@@ -13,6 +13,8 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  basePath: "/analytics-app",
+  assetPrefix: "/analytics-app",
   async headers() {
     return [
       {
