@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiUrl } from "@/lib/base-path";
+import { apiUrl, BASE_PATH } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type PickerType = "GA4" | "ADS" | "MERCHANT";
@@ -230,7 +230,7 @@ export default function ProjectDetailClient({
     setDeleteLoading(true);
     const response = await fetch(apiUrl(`/api/projects/${projectId}`), { method: "DELETE" });
     if (response.ok) {
-      window.location.href = "/projects";
+      window.location.href = `${BASE_PATH}/projects`;
       return;
     }
     const data = await response.json().catch(() => ({}));

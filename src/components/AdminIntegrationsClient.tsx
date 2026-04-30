@@ -212,11 +212,11 @@ export default function AdminIntegrationsClient({
           <div className="label">GA4 Workspace Account</div>
           <div className="text-sm text-slate/70">{ga4.connected ? `Connected ${ga4.email ?? ""}` : "Not connected"}</div>
           <div className="flex flex-wrap gap-2">
-            <a className="btn-primary" href="/api/integrations/google/start?type=GA4">
+            <a className="btn-primary" href={apiUrl("/api/integrations/google/start?type=GA4")}>
               {ga4.connected ? "Reconnect" : "Connect"}
             </a>
             {ga4.connected ? (
-              <form action="/api/integrations/GA4" method="post">
+              <form action={apiUrl("/api/integrations/GA4")} method="post">
                 <button className="btn-outline" type="submit">
                   Disconnect
                 </button>
@@ -234,11 +234,11 @@ export default function AdminIntegrationsClient({
             {merchant.connected ? `Connected ${merchant.email ?? ""}` : "Not connected"}
           </div>
           <div className="flex flex-wrap gap-2">
-            <a className="btn-primary" href="/api/integrations/google/start?type=MERCHANT">
+            <a className="btn-primary" href={apiUrl("/api/integrations/google/start?type=MERCHANT")}>
               {merchant.connected ? "Reconnect" : "Connect"}
             </a>
             {merchant.connected ? (
-              <form action="/api/integrations/MERCHANT" method="post">
+              <form action={apiUrl("/api/integrations/MERCHANT")} method="post">
                 <button className="btn-outline" type="submit">
                   Disconnect
                 </button>
@@ -254,11 +254,11 @@ export default function AdminIntegrationsClient({
           <div className="label">Google Ads Workspace Account</div>
           <div className="text-sm text-slate/70">{ads.connected ? `Connected ${ads.email ?? ""}` : "Not connected"}</div>
           <div className="flex flex-wrap gap-2">
-            <a className="btn-primary" href="/api/integrations/google/start?type=ADS">
+            <a className="btn-primary" href={apiUrl("/api/integrations/google/start?type=ADS")}>
               {ads.connected ? "Reconnect" : "Connect"}
             </a>
             {ads.connected ? (
-              <form action="/api/integrations/ADS" method="post">
+              <form action={apiUrl("/api/integrations/ADS")} method="post">
                 <button className="btn-outline" type="submit">
                   Disconnect
                 </button>

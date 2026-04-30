@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiUrl } from "@/lib/base-path";
+import { apiUrl, BASE_PATH } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 
@@ -831,7 +831,7 @@ export default function MerchantProductsClient({
                       : "AI is not configured yet."}
                   </div>
                   {isAdmin ? (
-                    <a className="text-xs font-semibold text-ocean" href="/admin/settings">
+                    <a className="text-xs font-semibold text-ocean" href={`${BASE_PATH}/admin/settings`}>
                       Configure AI in Settings
                     </a>
                   ) : null}

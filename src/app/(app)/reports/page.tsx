@@ -9,6 +9,7 @@ import ReportsFilters from "@/components/ReportsFilters";
 import TrendChart from "@/components/TrendChart";
 import ReportsDataTable from "@/components/ReportsDataTable";
 import Tabs from "@/components/Tabs";
+import { BASE_PATH, apiUrl } from "@/lib/base-path";
 
 export default async function ReportsPage({
   searchParams
@@ -213,7 +214,7 @@ export default async function ReportsPage({
             return (
               <a
                 key={item.key}
-                href={`/reports?${params.toString()}`}
+                href={`${BASE_PATH}/reports?${params.toString()}`}
                 className={`block rounded-xl px-3 py-2 text-sm ${
                   active ? "bg-slate/10 text-slate" : "text-slate/60 hover:bg-slate/5"
                 }`}
@@ -240,7 +241,7 @@ export default async function ReportsPage({
                     {formatDateShort(reportStart)} - {formatDateShort(reportEnd)}
                   </p>
                 </div>
-                <a className="btn-outline" href={`/api/projects/${project.id}/reports/export`}>
+                <a className="btn-outline" href={apiUrl(`/api/projects/${project.id}/reports/export`)}>
                   Export CSV
                 </a>
               </div>
@@ -250,7 +251,7 @@ export default async function ReportsPage({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="label">User acquisition</div>
-                      <a className="text-xs text-ocean" href={`/reports/acquisition-users?${filterParams.toString()}`}>
+                      <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/acquisition-users?${filterParams.toString()}`}>
                         View all
                       </a>
                     </div>
@@ -264,7 +265,7 @@ export default async function ReportsPage({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="label">Traffic acquisition</div>
-                      <a className="text-xs text-ocean" href={`/reports/acquisition-sessions?${filterParams.toString()}`}>
+                      <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/acquisition-sessions?${filterParams.toString()}`}>
                         View all
                       </a>
                     </div>
@@ -310,7 +311,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Top events</div>
-                            <a className="text-xs text-ocean" href={`/reports/top-events?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/top-events?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -326,7 +327,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Top pages</div>
-                            <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/top-pages?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -342,7 +343,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Least visited pages</div>
-                            <a className="text-xs text-ocean" href={`/reports/least-pages?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/least-pages?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -358,7 +359,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Search terms</div>
-                            <a className="text-xs text-ocean" href={`/reports/search-terms?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/search-terms?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -377,7 +378,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Top events</div>
-                            <a className="text-xs text-ocean" href={`/reports/top-events?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/top-events?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -391,7 +392,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Top pages</div>
-                            <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/top-pages?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -407,7 +408,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Least visited pages</div>
-                            <a className="text-xs text-ocean" href={`/reports/least-pages?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/least-pages?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -421,7 +422,7 @@ export default async function ReportsPage({
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="label">Search terms</div>
-                            <a className="text-xs text-ocean" href={`/reports/search-terms?${filterParams.toString()}`}>
+                            <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/search-terms?${filterParams.toString()}`}>
                               View all
                             </a>
                           </div>
@@ -459,7 +460,7 @@ export default async function ReportsPage({
                       <div className="label">E-commerce purchases</div>
                       <a
                         className="text-xs text-ocean"
-                        href={`/reports/ecommerce-purchases?${filterParams.toString()}`}
+                        href={`${BASE_PATH}/reports/ecommerce-purchases?${filterParams.toString()}`}
                       >
                         View all
                       </a>
@@ -529,7 +530,7 @@ export default async function ReportsPage({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="label">Top pages</div>
-                    <a className="text-xs text-ocean" href={`/reports/top-pages?${filterParams.toString()}`}>
+                    <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/top-pages?${filterParams.toString()}`}>
                       View all
                     </a>
                   </div>
@@ -554,7 +555,7 @@ export default async function ReportsPage({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Platform</div>
-                        <a className="text-xs text-ocean" href={`/reports/platform?${filterParams.toString()}`}>
+                        <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/platform?${filterParams.toString()}`}>
                           View all
                         </a>
                       </div>
@@ -570,7 +571,7 @@ export default async function ReportsPage({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Operating system</div>
-                        <a className="text-xs text-ocean" href={`/reports/operating-system?${filterParams.toString()}`}>
+                        <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/operating-system?${filterParams.toString()}`}>
                           View all
                         </a>
                       </div>
@@ -586,7 +587,7 @@ export default async function ReportsPage({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Browser</div>
-                        <a className="text-xs text-ocean" href={`/reports/browser?${filterParams.toString()}`}>
+                        <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/browser?${filterParams.toString()}`}>
                           View all
                         </a>
                       </div>
@@ -602,7 +603,7 @@ export default async function ReportsPage({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Device category</div>
-                        <a className="text-xs text-ocean" href={`/reports/device-category?${filterParams.toString()}`}>
+                        <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/device-category?${filterParams.toString()}`}>
                           View all
                         </a>
                       </div>
@@ -618,7 +619,7 @@ export default async function ReportsPage({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="label">Platform / device</div>
-                        <a className="text-xs text-ocean" href={`/reports/platform-device?${filterParams.toString()}`}>
+                        <a className="text-xs text-ocean" href={`${BASE_PATH}/reports/platform-device?${filterParams.toString()}`}>
                           View all
                         </a>
                       </div>

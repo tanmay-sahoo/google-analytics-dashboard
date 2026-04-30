@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// Keep this in sync with `basePath` in next.config.js and BASE_PATH in
+// src/lib/base-path.ts. middleware.ts lives outside src/ so the @/-alias
+// import doesn't resolve here.
+const BASE_PATH = "/analytics-app";
+
+// Build a redirect URL that respects the app's basePath. NextResponse.redirect
+// is a low-level primitive — it does NOT auto-prepend basePath like
+// `<Link>`/`router.push()`/`redirect()` do.
+function basePathRedirect(request: NextRequest, target: string) {
+  const url = request.nextUrl.clone();
+  const path = target.startsWith("/") ? target : `/${target}`;
+  url.pathname = `${BASE_PATH}${path}`;
+  url.search = "";
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -20,17 +36,17 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   if (!token) {
     const url = request.nextUrl.clone();
-    url.pathname = "/signin";
+    url.pathname = `${BASE_PATH}/signin`;
     url.searchParams.set("from", pathname);
     return NextResponse.redirect(url);
   }
 
   if (token.isActive === false) {
-    return NextResponse.redirect(new URL("/signin", request.url));
+    return basePathRedirect(request, "/signin");
   }
 
   if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return basePathRedirect(request, "/dashboard");
   }
 
   const access = Array.isArray(token.menuAccess) ? token.menuAccess : null;
@@ -47,7 +63,7 @@ export async function middleware(request: NextRequest) {
     ];
     const matched = map.find(([prefix]) => pathname.startsWith(prefix));
     if (matched && !access.includes(matched[1])) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return basePathRedirect(request, "/dashboard");
     }
   }
 

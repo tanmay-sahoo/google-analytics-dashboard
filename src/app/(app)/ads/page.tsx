@@ -11,6 +11,7 @@ import KPICard from "@/components/KPICard";
 import DualTrendChart from "@/components/DualTrendChart";
 import ReportsDataTable from "@/components/ReportsDataTable";
 import AdsBreakdownTabs from "@/components/AdsBreakdownTabs";
+import { BASE_PATH } from "@/lib/base-path";
 
 type RangeKey = "last7" | "last30" | "last90" | "month" | "custom";
 type AdsTabKey = "campaigns" | "products" | "locations" | "keywords";
@@ -164,7 +165,7 @@ export default async function AdsPage({
     start: formatDateShort(start),
     end: formatDateShort(end)
   }).toString();
-  const detailHref = (key: string) => `/ads/${key}?${filterParams}`;
+  const detailHref = (key: string) => `${BASE_PATH}/ads/${key}?${filterParams}`;
 
   const requestedTab = resolvedSearchParams?.tab;
   const activeTab: AdsTabKey =

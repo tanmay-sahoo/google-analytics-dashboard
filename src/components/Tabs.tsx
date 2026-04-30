@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type TabItem = {
   key: string;
   label: string;
@@ -65,7 +67,7 @@ export default function Tabs({
         }
 
         return (
-          <a
+          <Link
             key={item.key}
             href={buildHref(item.key)}
             role="tab"
@@ -73,7 +75,7 @@ export default function Tabs({
             className={className}
           >
             {inner}
-          </a>
+          </Link>
         );
       })}
     </div>
