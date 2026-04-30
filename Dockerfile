@@ -26,6 +26,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3002
 ENV HOSTNAME=0.0.0.0
+# Put node_modules/.bin on PATH so `next` and any other CLI bins resolve
+# regardless of how the entrypoint or wrapper invokes them.
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 -G nodejs nextjs
 
