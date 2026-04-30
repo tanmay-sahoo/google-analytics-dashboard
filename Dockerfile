@@ -39,6 +39,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
+# basepath.config.js is the URL-prefix toggle. next.config.js requires it at
+# runtime too (next start re-evaluates the config), so it must exist in the
+# runner image — otherwise the runtime basePath silently falls back to "" while
+# the build was compiled with a prefix, causing every prefixed route to 404.
+COPY --from=builder --chown=nextjs:nodejs /app/basepath.config.js* ./
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
