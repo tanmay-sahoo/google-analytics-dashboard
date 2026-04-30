@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type PickerType = "GA4" | "ADS" | "MERCHANT";
@@ -120,7 +121,7 @@ export default function ProjectDetailClient({
     if (type === "MERCHANT") setSelectedMerchantId(externalId);
 
     setMessage(null);
-    const response = await fetch("/api/datasources", {
+    const response = await fetch(apiUrl("/api/datasources"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projectId, type, externalId })
@@ -138,7 +139,7 @@ export default function ProjectDetailClient({
   async function syncNow() {
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/metrics/sync", {
+    const response = await fetch(apiUrl("/api/metrics/sync"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ projectId })
@@ -155,7 +156,7 @@ export default function ProjectDetailClient({
   async function loadGa4Properties() {
     setGa4Loading(true);
     setMessage(null);
-    const response = await fetch("/api/integrations/ga4/properties");
+    const response = await fetch(apiUrl("/api/integrations/ga4/properties"));
     if (response.ok) {
       const data = await response.json();
       const list = data.properties ?? [];
@@ -172,7 +173,7 @@ export default function ProjectDetailClient({
   async function loadMerchantAccounts() {
     setMerchantLoading(true);
     setMessage(null);
-    const response = await fetch("/api/integrations/merchant/imported");
+    const response = await fetch(apiUrl("/api/integrations/merchant/imported"));
     if (response.ok) {
       const data = await response.json();
       const list = data.accounts ?? [];
@@ -189,7 +190,7 @@ export default function ProjectDetailClient({
   async function loadAdsCustomers() {
     setAdsLoading(true);
     setMessage(null);
-    const response = await fetch("/api/integrations/ads/customers");
+    const response = await fetch(apiUrl("/api/integrations/ads/customers"));
     if (response.ok) {
       const data = await response.json();
       const list = (data.customers ?? []).map((item: { id: string; name?: string }) => ({
@@ -227,7 +228,7 @@ export default function ProjectDetailClient({
       return;
     }
     setDeleteLoading(true);
-    const response = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+    const response = await fetch(apiUrl(`/api/projects/${projectId}`), { method: "DELETE" });
     if (response.ok) {
       window.location.href = "/projects";
       return;

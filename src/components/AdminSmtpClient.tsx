@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type SmtpSummary = {
@@ -42,7 +43,7 @@ export default function AdminSmtpClient() {
   async function load() {
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/admin/smtp");
+    const response = await fetch(apiUrl("/api/admin/smtp"));
     if (!response.ok) {
       setLoading(false);
       setMessage("Failed to load SMTP config.");
@@ -83,7 +84,7 @@ export default function AdminSmtpClient() {
     };
     if (form.password) payload.password = form.password;
 
-    const response = await fetch("/api/admin/smtp", {
+    const response = await fetch(apiUrl("/api/admin/smtp"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -101,7 +102,7 @@ export default function AdminSmtpClient() {
   async function remove() {
     if (!confirm("Remove SMTP configuration?")) return;
     setSaving(true);
-    const response = await fetch("/api/admin/smtp", { method: "DELETE" });
+    const response = await fetch(apiUrl("/api/admin/smtp"), { method: "DELETE" });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       setMessage(data.error ?? "Failed to remove.");
@@ -119,7 +120,7 @@ export default function AdminSmtpClient() {
     }
     setTesting(true);
     setMessage(null);
-    const response = await fetch("/api/admin/smtp/test", {
+    const response = await fetch(apiUrl("/api/admin/smtp/test"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: testEmail })

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import Sparkline from "@/components/Sparkline";
@@ -292,7 +293,7 @@ export default function DashboardClient({
       const { start, end } = resolveRange("last30");
       setHighlightsLoading(true);
       const params = new URLSearchParams({ projectId: selectedProjectId, start, end });
-      void fetch(`/api/metrics/dashboard/highlights?${params.toString()}`)
+      void fetch(apiUrl(`/api/metrics/dashboard/highlights?${params.toString()}`))
         .then(async (response) => {
           if (!response.ok) return;
           const data = (await response.json()) as DashboardPayload["highlights"];
@@ -359,9 +360,9 @@ export default function DashboardClient({
     setCoreError(null);
 
     // Fire all three in parallel — each section reveals as soon as its slice arrives.
-    const corePromise = fetch(`/api/metrics/dashboard/core?${coreParams.toString()}`);
-    const realtimePromise = fetch(`/api/metrics/dashboard/realtime?${realtimeParams.toString()}`);
-    const highlightsPromise = fetch(`/api/metrics/dashboard/highlights?${highlightsParams.toString()}`);
+    const corePromise = fetch(apiUrl(`/api/metrics/dashboard/core?${coreParams.toString()}`));
+    const realtimePromise = fetch(apiUrl(`/api/metrics/dashboard/realtime?${realtimeParams.toString()}`));
+    const highlightsPromise = fetch(apiUrl(`/api/metrics/dashboard/highlights?${highlightsParams.toString()}`));
 
     void corePromise
       .then(async (response) => {

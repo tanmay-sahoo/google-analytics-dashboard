@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type Ga4Property = { id: string; displayName: string; accountId?: string; accountName?: string };
@@ -34,7 +35,7 @@ export default function AdminIntegrationsClient({
   async function loadGa4() {
     setLoading("GA4");
     setMessage(null);
-    const response = await fetch("/api/integrations/ga4/properties");
+    const response = await fetch(apiUrl("/api/integrations/ga4/properties"));
     if (!response.ok) {
       let errorMessage = "Failed to load GA4 properties";
       try {
@@ -57,7 +58,7 @@ export default function AdminIntegrationsClient({
   async function importGa4Projects() {
     setMessage(null);
     const body = selectedGa4.size > 0 ? JSON.stringify({ propertyIds: Array.from(selectedGa4) }) : null;
-    const response = await fetch("/api/integrations/ga4/import", {
+    const response = await fetch(apiUrl("/api/integrations/ga4/import"), {
       method: "POST",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body
@@ -75,7 +76,7 @@ export default function AdminIntegrationsClient({
   async function loadAds() {
     setLoading("ADS");
     setMessage(null);
-    const response = await fetch("/api/integrations/ads/customers");
+    const response = await fetch(apiUrl("/api/integrations/ads/customers"));
     if (!response.ok) {
       let errorMessage = "Failed to load Ads customers";
       try {
@@ -98,7 +99,7 @@ export default function AdminIntegrationsClient({
   async function loadMerchant() {
     setLoading("MERCHANT");
     setMessage(null);
-    const response = await fetch("/api/integrations/merchant/accounts");
+    const response = await fetch(apiUrl("/api/integrations/merchant/accounts"));
     if (!response.ok) {
       let errorMessage = "Failed to load Merchant accounts";
       try {
@@ -124,7 +125,7 @@ export default function AdminIntegrationsClient({
       return;
     }
     const payload = merchantAccounts.filter((account) => selectedMerchant.has(account.id));
-    const response = await fetch("/api/integrations/merchant/import", {
+    const response = await fetch(apiUrl("/api/integrations/merchant/import"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accounts: payload })

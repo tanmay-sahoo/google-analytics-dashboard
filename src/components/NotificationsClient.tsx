@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import Link from "next/link";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
@@ -57,7 +58,7 @@ export default function NotificationsClient({
     if (projectFilter) params.set("projectId", projectFilter);
     if (debouncedSearch) params.set("q", debouncedSearch);
     try {
-      const res = await fetch(`/api/notifications?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(apiUrl(`/api/notifications?${params.toString()}`), { cache: "no-store" });
       if (!res.ok) {
         setMessage("Failed to load notifications.");
         return;
@@ -102,7 +103,7 @@ export default function NotificationsClient({
   }, [items, sortKey, sortDirection]);
 
   async function markOneRead(id: string) {
-    await fetch("/api/notifications/read", {
+    await fetch(apiUrl("/api/notifications/read"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [id] })
@@ -115,7 +116,7 @@ export default function NotificationsClient({
       setMessage("Each user can only mark their own notifications as read.");
       return;
     }
-    await fetch("/api/notifications/read", {
+    await fetch(apiUrl("/api/notifications/read"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ all: true })

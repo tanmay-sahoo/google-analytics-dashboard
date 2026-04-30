@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import { t } from "@/lib/i18n";
 import NotificationBell from "@/components/NotificationBell";
 
@@ -27,7 +28,7 @@ export default function Topbar({
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
     document.querySelector(".app-shell")?.setAttribute("data-theme", next);
-    await fetch("/api/account/preferences", {
+    await fetch(apiUrl("/api/account/preferences"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ theme: next })

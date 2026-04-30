@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage from "@/components/FlashMessage";
 
 export default function ChangePasswordPage() {
@@ -19,7 +20,7 @@ export default function ChangePasswordPage() {
       newPassword: String(formData.get("newPassword"))
     };
 
-    const response = await fetch("/api/account/password", {
+    const response = await fetch(apiUrl("/api/account/password"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

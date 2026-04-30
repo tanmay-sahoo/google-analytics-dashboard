@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 
@@ -147,7 +148,7 @@ export default function MerchantProductsClient({
 
   async function loadAiSettings() {
     setAiLoading(true);
-    const response = await fetch("/api/ai/settings");
+    const response = await fetch(apiUrl("/api/ai/settings"));
     if (!response.ok) {
       setAiSettings(null);
       setAiLoading(false);
@@ -220,7 +221,7 @@ export default function MerchantProductsClient({
 
   async function loadImported() {
     if (!selectedProjectId) return;
-    const response = await fetch(`/api/merchant/products/imported?projectId=${selectedProjectId}`);
+    const response = await fetch(apiUrl(`/api/merchant/products/imported?projectId=${selectedProjectId}`));
     if (!response.ok) {
       return;
     }
@@ -249,7 +250,7 @@ export default function MerchantProductsClient({
     try {
       for (let index = 0; index < payload.length; index += batchSize) {
         const batch = payload.slice(index, index + batchSize);
-        const response = await fetch("/api/merchant/products/import", {
+        const response = await fetch(apiUrl("/api/merchant/products/import"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -282,7 +283,7 @@ export default function MerchantProductsClient({
 
   async function deleteMerchantAccount(merchantId: string) {
     if (!isAdmin) return;
-    const response = await fetch(`/api/integrations/merchant/imported/${merchantId}`, {
+    const response = await fetch(apiUrl(`/api/integrations/merchant/imported/${merchantId}`), {
       method: "DELETE"
     });
     if (!response.ok) {
@@ -297,7 +298,7 @@ export default function MerchantProductsClient({
       setMessage("AI settings are not configured yet.");
       return;
     }
-    const response = await fetch("/api/ai/suggest", {
+    const response = await fetch(apiUrl("/api/ai/suggest"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

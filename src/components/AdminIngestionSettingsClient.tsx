@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type IngestionSettings = {
@@ -42,7 +43,7 @@ export default function AdminIngestionSettingsClient({
   async function saveSettings() {
     setSaving(true);
     setMessage(null);
-    const response = await fetch("/api/admin/ingestion-settings", {
+    const response = await fetch(apiUrl("/api/admin/ingestion-settings"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled, intervalMins })
@@ -59,7 +60,7 @@ export default function AdminIngestionSettingsClient({
   async function runNow() {
     setRunning(true);
     setMessage(null);
-    const response = await fetch("/api/cron/ingest-metrics?force=1", {
+    const response = await fetch(apiUrl("/api/cron/ingest-metrics?force=1"), {
       method: "POST"
     });
     if (!response.ok) {

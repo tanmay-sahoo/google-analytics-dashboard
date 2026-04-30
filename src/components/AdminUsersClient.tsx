@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 
@@ -58,7 +59,7 @@ export default function AdminUsersClient({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   async function refetch() {
-    const response = await fetch("/api/users");
+    const response = await fetch(apiUrl("/api/users"));
     const data = await response.json();
     const list: User[] = Array.isArray(data.users)
       ? data.users.map((row: User & { projectUsers?: { projectId: string }[] }) => ({
@@ -84,7 +85,7 @@ export default function AdminUsersClient({
       projectIds: effectiveProjects
     };
 
-    const response = await fetch("/api/users", {
+    const response = await fetch(apiUrl("/api/users"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -105,7 +106,7 @@ export default function AdminUsersClient({
   }
 
   async function updateUser(id: string, payload: Record<string, unknown>) {
-    const response = await fetch(`/api/users/${id}`, {
+    const response = await fetch(apiUrl(`/api/users/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -120,7 +121,7 @@ export default function AdminUsersClient({
   }
 
   async function deleteUser(id: string) {
-    const response = await fetch(`/api/users/${id}`, { method: "DELETE" });
+    const response = await fetch(apiUrl(`/api/users/${id}`), { method: "DELETE" });
     if (response.ok) {
       await refetch();
       setMessage("User deleted.");

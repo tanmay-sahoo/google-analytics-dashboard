@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type AiConfig = {
@@ -41,7 +42,7 @@ export default function AdminAiSettingsClient() {
   async function loadConfigs() {
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/admin/ai-configs");
+    const response = await fetch(apiUrl("/api/admin/ai-configs"));
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       setMessage(data.error ?? "Failed to load AI configs.");
@@ -60,7 +61,7 @@ export default function AdminAiSettingsClient() {
     }
     setLoadingModels(true);
     setMessage(null);
-    const response = await fetch("/api/admin/ai-configs/models", {
+    const response = await fetch(apiUrl("/api/admin/ai-configs/models"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider, apiKey })
@@ -83,7 +84,7 @@ export default function AdminAiSettingsClient() {
     }
     setLoading(true);
     setMessage(null);
-    const response = await fetch("/api/admin/ai-configs", {
+    const response = await fetch(apiUrl("/api/admin/ai-configs"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider, model, apiKey, isDefault: setDefault })
@@ -105,7 +106,7 @@ export default function AdminAiSettingsClient() {
   }
 
   async function setDefaultConfig(id: string) {
-    const response = await fetch(`/api/admin/ai-configs/${id}`, {
+    const response = await fetch(apiUrl(`/api/admin/ai-configs/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isDefault: true })
@@ -118,7 +119,7 @@ export default function AdminAiSettingsClient() {
   }
 
   async function deleteConfig(id: string) {
-    const response = await fetch(`/api/admin/ai-configs/${id}`, { method: "DELETE" });
+    const response = await fetch(apiUrl(`/api/admin/ai-configs/${id}`), { method: "DELETE" });
     if (!response.ok) {
       setMessage("Failed to delete AI config.");
       return;

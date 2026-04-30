@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import { addDays, formatLocalDate } from "@/lib/time";
@@ -81,7 +82,7 @@ export default function ReportsFilters({
     force: boolean;
   }) {
     try {
-      await fetch("/api/reports/prefetch", {
+      await fetch(apiUrl("/api/reports/prefetch"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

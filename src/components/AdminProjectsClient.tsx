@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 type Project = {
@@ -25,7 +26,7 @@ export default function AdminProjectsClient({
   const messageTone = inferTone(message);
 
   async function refetch() {
-    const response = await fetch("/api/projects");
+    const response = await fetch(apiUrl("/api/projects"));
     const data = await response.json();
     setProjects(data.projects);
   }
@@ -38,7 +39,7 @@ export default function AdminProjectsClient({
       currency: String(formData.get("currency"))
     };
 
-    const response = await fetch("/api/projects", {
+    const response = await fetch(apiUrl("/api/projects"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -53,7 +54,7 @@ export default function AdminProjectsClient({
   }
 
   async function updateProject(id: string, payload: Record<string, string>) {
-    const response = await fetch(`/api/projects/${id}`, {
+    const response = await fetch(apiUrl(`/api/projects/${id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -68,7 +69,7 @@ export default function AdminProjectsClient({
   }
 
   async function assignUsers(id: string, userIds: string[]) {
-    const response = await fetch(`/api/projects/${id}/assign`, {
+    const response = await fetch(apiUrl(`/api/projects/${id}/assign`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userIds })
@@ -83,7 +84,7 @@ export default function AdminProjectsClient({
   }
 
   async function deleteProject(id: string) {
-    const response = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    const response = await fetch(apiUrl(`/api/projects/${id}`), { method: "DELETE" });
     if (response.ok) {
       await refetch();
       setMessage("Project deleted.");

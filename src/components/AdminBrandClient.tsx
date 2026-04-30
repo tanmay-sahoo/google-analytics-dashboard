@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 
 const MAX_FILE_BYTES = 256 * 1024; // 256KB raw
@@ -19,7 +20,7 @@ export default function AdminBrandClient() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/brand", { cache: "no-store" });
+      const res = await fetch(apiUrl("/api/admin/brand"), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setLogoData(typeof data.logoData === "string" ? data.logoData : null);
@@ -46,7 +47,7 @@ export default function AdminBrandClient() {
     const dataUri = await readFileAsDataUri(file);
     setSaving(true);
     setMessage(null);
-    const res = await fetch("/api/admin/brand", {
+    const res = await fetch(apiUrl("/api/admin/brand"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ logoData: dataUri })
@@ -65,7 +66,7 @@ export default function AdminBrandClient() {
   async function clearLogo() {
     setSaving(true);
     setMessage(null);
-    const res = await fetch("/api/admin/brand", {
+    const res = await fetch(apiUrl("/api/admin/brand"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ logoData: null })

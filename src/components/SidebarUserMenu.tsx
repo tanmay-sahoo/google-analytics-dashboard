@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import { signOut } from "next-auth/react";
 import { t } from "@/lib/i18n";
 import FlashMessage from "@/components/FlashMessage";
@@ -51,7 +52,7 @@ export default function SidebarUserMenu({
     localStorage.setItem(LANG_KEY, value);
     onLocaleChange?.(value);
     document.documentElement.setAttribute("lang", value);
-    await fetch("/api/account/preferences", {
+    await fetch(apiUrl("/api/account/preferences"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ locale: value })
@@ -75,7 +76,7 @@ export default function SidebarUserMenu({
       return;
     }
 
-    const response = await fetch("/api/account/password", {
+    const response = await fetch(apiUrl("/api/account/password"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword, newPassword })

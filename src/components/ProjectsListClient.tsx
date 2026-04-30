@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { apiUrl } from "@/lib/base-path";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import FlashMessage from "@/components/FlashMessage";
@@ -48,7 +49,7 @@ export default function ProjectsListClient({
     }
 
     try {
-      const response = await fetch("/api/projects", {
+      const response = await fetch(apiUrl("/api/projects"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -89,7 +90,7 @@ export default function ProjectsListClient({
     setConfirmError(null);
     setBusyId(confirmProject.id);
     try {
-      const response = await fetch(`/api/projects/${confirmProject.id}`, {
+      const response = await fetch(apiUrl(`/api/projects/${confirmProject.id}`), {
         method: "DELETE"
       });
       if (!response.ok) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import Link from "next/link";
 
 type Notification = {
@@ -35,7 +36,7 @@ export default function NotificationBell() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/notifications?limit=20", { cache: "no-store" });
+      const res = await fetch(apiUrl("/api/notifications?limit=20"), { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       setItems(Array.isArray(data.notifications) ? data.notifications : []);
@@ -64,7 +65,7 @@ export default function NotificationBell() {
 
   async function markAllRead() {
     setLoading(true);
-    await fetch("/api/notifications/read", {
+    await fetch(apiUrl("/api/notifications/read"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ all: true })
@@ -74,7 +75,7 @@ export default function NotificationBell() {
   }
 
   async function markOneRead(id: string) {
-    await fetch("/api/notifications/read", {
+    await fetch(apiUrl("/api/notifications/read"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [id] })

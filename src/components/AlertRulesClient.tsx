@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import FlashMessage, { inferTone } from "@/components/FlashMessage";
 import SortableHeader from "@/components/SortableHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -96,7 +97,7 @@ export default function AlertRulesClient({
   const [createEvalMins, setCreateEvalMins] = useState(60);
 
   async function fetchRules() {
-    const response = await fetch("/api/alerts");
+    const response = await fetch(apiUrl("/api/alerts"));
     if (!response.ok) {
       setMessage("Failed to load alert rules.");
       return;
@@ -129,7 +130,7 @@ export default function AlertRulesClient({
       enabled: true
     };
 
-    const response = await fetch("/api/alerts", {
+    const response = await fetch(apiUrl("/api/alerts"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -166,7 +167,7 @@ export default function AlertRulesClient({
       enabled: String(formData.get("enabled")) === "on"
     };
 
-    const response = await fetch(`/api/alerts/${editingRule.id}`, {
+    const response = await fetch(apiUrl(`/api/alerts/${editingRule.id}`), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -188,7 +189,7 @@ export default function AlertRulesClient({
   async function confirmDeleteRule() {
     if (!deletingRule) return;
     setSaving(true);
-    const response = await fetch(`/api/alerts/${deletingRule.id}`, { method: "DELETE" });
+    const response = await fetch(apiUrl(`/api/alerts/${deletingRule.id}`), { method: "DELETE" });
     if (!response.ok) {
       setMessage("Failed to delete alert rule.");
       setSaving(false);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiUrl } from "@/lib/base-path";
 import Link from "next/link";
 import FlashMessage from "@/components/FlashMessage";
 
@@ -22,7 +23,7 @@ export default function SignUpPage() {
       password: String(formData.get("password"))
     };
 
-    const response = await fetch("/api/auth/signup", {
+    const response = await fetch(apiUrl("/api/auth/signup"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

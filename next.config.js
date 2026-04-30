@@ -22,6 +22,17 @@ const nextConfig = {
         headers: securityHeaders
       }
     ];
+  },
+  async redirects() {
+    return [
+      // Hitting the bare root sends users into the prefixed app.
+      {
+        source: "/",
+        destination: "/analytics-app",
+        basePath: false,
+        permanent: false
+      }
+    ];
   }
 };
 
