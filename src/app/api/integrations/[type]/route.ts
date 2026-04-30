@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, isAdmin } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
+import { BASE_PATH } from "@/lib/base-path";
 
 export async function POST(request: Request, context: { params: Promise<{ type: string }> }) {
   const { type } = await context.params;
@@ -15,5 +16,5 @@ export async function POST(request: Request, context: { params: Promise<{ type: 
 
   await prisma.integrationSetting.delete({ where: { type } }).catch(() => null);
 
-  return NextResponse.redirect(new URL("/admin/integrations", request.url));
+  return NextResponse.redirect(new URL(`${BASE_PATH}/admin/integrations`, request.url));
 }

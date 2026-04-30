@@ -4,11 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { exchangeCode, getUserEmail } from "@/lib/google-oauth";
 import { verifyState } from "@/lib/oauth-state";
+import { BASE_PATH } from "@/lib/base-path";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
-    return NextResponse.redirect(new URL("/signin", request.url));
+    return NextResponse.redirect(new URL(`${BASE_PATH}/signin`, request.url));
   }
   if (session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -51,5 +52,5 @@ export async function GET(request: Request) {
     }
   });
 
-  return NextResponse.redirect(new URL("/admin/integrations", request.url));
+  return NextResponse.redirect(new URL(`${BASE_PATH}/admin/integrations`, request.url));
 }

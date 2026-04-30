@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FlashMessage from "@/components/FlashMessage";
+import { BASE_PATH } from "@/lib/base-path";
 
 function SignInForm() {
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +22,18 @@ function SignInForm() {
     const email = String(formData.get("email"));
     const password = String(formData.get("password"));
 
+    // Build an absolute URL so NextAuth's same-origin check returns it as-is.
+    // A bare path like "/dashboard" gets `${NEXTAUTH_URL}${path}` concat'd by
+    // the default redirect callback — which loses (or doubles) the basePath
+    // depending on how NEXTAUTH_URL is configured. Sourcing the origin from
+    // window.location sidesteps that mismatch entirely.
+    const path = from.startsWith(BASE_PATH) ? from : `${BASE_PATH}${from}`;
+    const callbackUrl = `${window.location.origin}${path}`;
     const result = await signIn("credentials", {
       redirect: false,
       email,
       password,
-      callbackUrl: from
+      callbackUrl
     });
 
     if (result?.error) {

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { apiUrl } from "@/lib/base-path";
+import { apiUrl, BASE_PATH } from "@/lib/base-path";
 import { signOut } from "next-auth/react";
 import { t } from "@/lib/i18n";
 import FlashMessage from "@/components/FlashMessage";
@@ -153,7 +153,9 @@ export default function SidebarUserMenu({
             {t(lang, "changePassword")}
           </button>
           <button
-            onClick={() => signOut({ callbackUrl: "/signin" })}
+            onClick={() =>
+              signOut({ callbackUrl: `${window.location.origin}${BASE_PATH}/signin` })
+            }
             className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-slate/70 hover:bg-slate/5"
           >
             {t(lang, "signOut")}
