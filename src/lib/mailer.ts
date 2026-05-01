@@ -41,7 +41,8 @@ export function formatFrom(config: SmtpConfig) {
 }
 
 export async function sendMail(options: {
-  to: string | string[];
+  to?: string | string[];
+  bcc?: string | string[];
   subject: string;
   text?: string;
   html?: string;
@@ -54,7 +55,8 @@ export async function sendMail(options: {
     const transport = buildTransport(config);
     const info = await transport.sendMail({
       from: formatFrom(config),
-      to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+      to: options.to ? (Array.isArray(options.to) ? options.to.join(", ") : options.to) : config.fromEmail,
+      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(", ") : options.bcc) : undefined,
       subject: options.subject,
       text: options.text,
       html: options.html

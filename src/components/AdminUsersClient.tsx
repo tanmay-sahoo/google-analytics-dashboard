@@ -12,6 +12,7 @@ type User = {
   role: string;
   isActive: boolean;
   menuAccess: string[] | null;
+  notificationsEnabled?: boolean;
   createdAt?: string;
   createdBy?: { id: string; name: string | null; email: string | null } | null;
   projectIds?: string[];
@@ -52,6 +53,8 @@ export default function AdminUsersClient({
   const [selectedActive, setSelectedActive] = useState(true);
   const [createRole, setCreateRole] = useState<string>("USER");
   const [createActive, setCreateActive] = useState(true);
+  const [createNotifEnabled, setCreateNotifEnabled] = useState(false);
+  const [selectedNotifEnabled, setSelectedNotifEnabled] = useState(false);
   const messageTone = inferTone(message);
   const [sortKey, setSortKey] = useState<
     "name" | "email" | "role" | "status" | "menuAccess" | "createdBy" | "manage"
@@ -82,7 +85,8 @@ export default function AdminUsersClient({
       role: createRole,
       isActive: createActive,
       menuAccess: effectiveMenus,
-      projectIds: effectiveProjects
+      projectIds: effectiveProjects,
+      notificationsEnabled: createRole === "ADMIN" ? true : createNotifEnabled
     };
 
     const response = await fetch(apiUrl("/api/users"), {
@@ -99,6 +103,7 @@ export default function AdminUsersClient({
       setCreateProjectIds([]);
       setCreateRole("USER");
       setCreateActive(true);
+      setCreateNotifEnabled(false);
       form.reset();
     } else {
       setMessage("Failed to create user.");
@@ -143,6 +148,7 @@ export default function AdminUsersClient({
     setSelectedProjectIds(user.projectIds ?? []);
     setSelectedRole(user.role);
     setSelectedActive(user.isActive);
+    setSelectedNotifEnabled(user.notificationsEnabled ?? user.role === "ADMIN");
   }
 
   function toggleSelectedAccess(key: string) {
@@ -231,6 +237,7 @@ export default function AdminUsersClient({
             setCreateRole("USER");
             setMenuAccess([]);
             setCreateActive(true);
+            setCreateNotifEnabled(false);
           }}
         >
           + Create user
@@ -285,6 +292,30 @@ export default function AdminUsersClient({
                   <span
                     className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
                       createActive ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </label>
+              <label className="md:col-span-2 flex items-center justify-between rounded-xl border border-slate/10 bg-white px-4 py-3 text-sm">
+                <div>
+                  <div className="text-slate/70">Email notifications</div>
+                  <div className="mt-0.5 text-xs text-slate/50">
+                    {createRole === "ADMIN"
+                      ? "Admins always receive alert emails."
+                      : "Send alert emails for projects this user has access to."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={createRole === "ADMIN"}
+                  className={`relative h-6 w-11 rounded-full transition ${
+                    createRole === "ADMIN" || createNotifEnabled ? "bg-emerald-500" : "bg-slate/30"
+                  } ${createRole === "ADMIN" ? "opacity-70 cursor-not-allowed" : ""}`}
+                  onClick={() => setCreateNotifEnabled((current) => !current)}
+                >
+                  <span
+                    className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
+                      createRole === "ADMIN" || createNotifEnabled ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>
@@ -402,6 +433,30 @@ export default function AdminUsersClient({
                   />
                 </button>
               </label>
+              <label className="md:col-span-2 flex items-center justify-between rounded-xl border border-slate/10 bg-white px-4 py-3 text-sm">
+                <div>
+                  <div className="text-slate/70">Email notifications</div>
+                  <div className="mt-0.5 text-xs text-slate/50">
+                    {selectedRole === "ADMIN"
+                      ? "Admins always receive alert emails."
+                      : "Send alert emails for projects this user has access to."}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedRole === "ADMIN"}
+                  className={`relative h-6 w-11 rounded-full transition ${
+                    selectedRole === "ADMIN" || selectedNotifEnabled ? "bg-emerald-500" : "bg-slate/30"
+                  } ${selectedRole === "ADMIN" ? "opacity-70 cursor-not-allowed" : ""}`}
+                  onClick={() => setSelectedNotifEnabled((current) => !current)}
+                >
+                  <span
+                    className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition ${
+                      selectedRole === "ADMIN" || selectedNotifEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </label>
               <div className="md:col-span-2">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate/50">Menu access</div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -486,7 +541,8 @@ export default function AdminUsersClient({
                       role: selectedRole,
                       isActive: selectedActive,
                       menuAccess: selectedAccess,
-                      projectIds: selectedRole === "ADMIN" ? [] : selectedProjectIds
+                      projectIds: selectedRole === "ADMIN" ? [] : selectedProjectIds,
+                      notificationsEnabled: selectedRole === "ADMIN" ? true : selectedNotifEnabled
                     })
                   }
                 >

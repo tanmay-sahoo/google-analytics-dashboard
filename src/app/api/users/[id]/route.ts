@@ -11,7 +11,8 @@ const updateSchema = z.object({
   password: z.string().min(8).optional(),
   isActive: z.boolean().optional(),
   menuAccess: z.array(z.string()).optional(),
-  projectIds: z.array(z.string().min(1)).optional()
+  projectIds: z.array(z.string().min(1)).optional(),
+  notificationsEnabled: z.boolean().optional()
 });
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -33,6 +34,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     passwordHash?: string;
     isActive?: boolean;
     menuAccess?: string[];
+    notificationsEnabled?: boolean;
   } = {};
   if (parsed.data.name) data.name = parsed.data.name;
   if (parsed.data.role) data.role = parsed.data.role;
@@ -40,6 +42,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   if (parsed.data.menuAccess !== undefined) data.menuAccess = parsed.data.menuAccess;
   if (parsed.data.password) {
     data.passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  }
+  // Admin role implies notifications on — see POST /api/users for rationale.
+  if (parsed.data.role === "ADMIN") {
+    data.notificationsEnabled = true;
+  } else if (parsed.data.notificationsEnabled !== undefined) {
+    data.notificationsEnabled = parsed.data.notificationsEnabled;
   }
 
   await prisma.user.update({

@@ -190,7 +190,7 @@ export default function MerchantProductsClient({
         }
         const tokenParam: string = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
         const response = await fetch(
-          `/api/merchant/products?merchantId=${selectedMerchantId}&projectId=${selectedProjectId}&paged=1${tokenParam}`,
+          apiUrl(`/api/merchant/products?merchantId=${selectedMerchantId}&projectId=${selectedProjectId}&paged=1${tokenParam}`),
           { signal: controller.signal }
         );
         if (!response.ok) {

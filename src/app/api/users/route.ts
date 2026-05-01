@@ -12,7 +12,8 @@ const createSchema = z.object({
   role: z.enum(["ADMIN", "USER"]),
   isActive: z.boolean().optional(),
   menuAccess: z.array(z.string()).optional(),
-  projectIds: z.array(z.string().min(1)).optional()
+  projectIds: z.array(z.string().min(1)).optional(),
+  notificationsEnabled: z.boolean().optional()
 });
 
 export async function GET() {
@@ -30,6 +31,7 @@ export async function GET() {
       role: true,
       isActive: true,
       menuAccess: true,
+      notificationsEnabled: true,
       createdAt: true,
       createdBy: { select: { id: true, name: true, email: true } },
       projectUsers: { select: { projectId: true } }
@@ -57,6 +59,11 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+  // Admins always receive alert emails — the rule "all admin users get
+  // notifications automatically" is enforced server-side so a future client
+  // bug can't silently disable it.
+  const notificationsEnabled =
+    parsed.data.role === "ADMIN" ? true : parsed.data.notificationsEnabled ?? false;
   const created = await prisma.user.create({
     data: {
       name: parsed.data.name,
@@ -65,6 +72,7 @@ export async function POST(request: Request) {
       role: parsed.data.role,
       isActive: parsed.data.isActive ?? true,
       menuAccess: parsed.data.menuAccess ?? undefined,
+      notificationsEnabled,
       createdById: user.id
     }
   });

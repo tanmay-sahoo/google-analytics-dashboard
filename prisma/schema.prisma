@@ -73,6 +73,7 @@ model User {
   role         Role         @default(USER)
   isActive     Boolean      @default(true)
   menuAccess   Json?
+  notificationsEnabled Boolean @default(false)
   locale       String       @default("en")
   theme        String       @default("light")
   createdById  String?

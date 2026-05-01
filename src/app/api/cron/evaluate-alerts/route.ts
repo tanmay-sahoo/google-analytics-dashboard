@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { getMetricField, getMetricSource } from "@/lib/metrics-catalog";
+import { renderAlertEmail } from "@/lib/email-templates";
+import { BASE_PATH } from "@/lib/base-path";
 
 const UNIT_MS: Record<string, number> = {
   MINUTES: 60_000,
@@ -33,7 +35,14 @@ export async function POST() {
     include: { project: true }
   });
 
-  const results = [] as { ruleId: string; triggered: boolean; skipped?: boolean }[];
+  const results = [] as {
+    ruleId: string;
+    triggered: boolean;
+    skipped?: boolean;
+    emailSent?: boolean;
+    emailError?: string;
+    emailRecipients?: number;
+  }[];
 
   for (const rule of rules) {
     const dueAt = rule.lastEvaluatedAt
@@ -115,16 +124,30 @@ export async function POST() {
         }
       });
 
-      const recipients = await prisma.projectUser.findMany({
-        where: { projectId: rule.projectId },
-        include: { user: { select: { id: true, email: true, isActive: true } } }
+      // In-app notifications go to every active user assigned to the project,
+      // plus all active admins (admins can see everything).
+      const projectMembers = await prisma.user.findMany({
+        where: {
+          isActive: true,
+          projectUsers: { some: { projectId: rule.projectId } }
+        },
+        select: { id: true, email: true, role: true, notificationsEnabled: true }
       });
-      const activeUsers = recipients.filter((row) => row.user?.isActive !== false && row.user?.email);
+      const admins = await prisma.user.findMany({
+        where: { isActive: true, role: "ADMIN" },
+        select: { id: true, email: true, role: true, notificationsEnabled: true }
+      });
 
-      if (activeUsers.length > 0) {
+      const allRecipientsById = new Map<string, { id: string; email: string; role: string; notificationsEnabled: boolean }>();
+      for (const u of [...projectMembers, ...admins]) {
+        if (u.email) allRecipientsById.set(u.id, u);
+      }
+      const allRecipients = [...allRecipientsById.values()];
+
+      if (allRecipients.length > 0) {
         await prisma.notification.createMany({
-          data: activeUsers.map((row) => ({
-            userId: row.user!.id,
+          data: allRecipients.map((u) => ({
+            userId: u.id,
             projectId: rule.projectId,
             alertEventId: event.id,
             kind: "ALERT" as const,
@@ -135,26 +158,64 @@ export async function POST() {
         });
       }
 
+      // Email recipients: every admin (always) + non-admin users with
+      // notificationsEnabled=true who are assigned to this project. Rule-level
+      // channels.email still gates whether email goes out at all.
       const channels = (rule.channels as { email?: boolean } | null) ?? null;
-      if (channels?.email && activeUsers.length > 0) {
-        const subject = `[Alert] ${rule.project.name}: ${rule.metric}`;
-        const text = `Alert "${rule.metric}" triggered for project "${rule.project.name}".
-
-${eventMessage}
-
-Window: ${windowLabel}
-Aggregation: ${aggLabel}
-Evaluated at: ${now.toISOString()}`;
-        const mailResult = await sendMail({
-          to: activeUsers.map((row) => row.user!.email),
-          subject,
-          text
-        });
-        if (mailResult.ok) {
-          await prisma.alertEvent.update({
-            where: { id: event.id },
-            data: { status: "DELIVERED", deliveredAt: new Date() }
+      if (channels?.email) {
+        const emailRecipients = allRecipients.filter(
+          (u) => u.role === "ADMIN" || u.notificationsEnabled
+        );
+        if (emailRecipients.length > 0) {
+          // APP_BASE_URL / NEXTAUTH_URL on the server usually already include
+          // the basePath segment — strip a trailing slash and BASE_PATH suffix
+          // so we don't end up with /analytics-app/analytics-app/alerts.
+          const rawBase = (process.env.APP_BASE_URL || process.env.NEXTAUTH_URL || "").replace(/\/$/, "");
+          const origin = BASE_PATH && rawBase.endsWith(BASE_PATH) ? rawBase.slice(0, -BASE_PATH.length) : rawBase;
+          const alertsUrl = `${origin}${BASE_PATH}/alerts`;
+          const { subject, html, text } = renderAlertEmail({
+            projectName: rule.project.name,
+            metric: rule.metric,
+            condition: rule.condition as "GT" | "LT" | "PCT_CHANGE",
+            threshold: rule.threshold,
+            aggregation: aggLabel,
+            windowLabel,
+            message: eventMessage,
+            value: aggregateValue,
+            comparedAgainst,
+            evaluatedAt: now,
+            alertsUrl
           });
+          // Use BCC so recipients don't see each other's addresses. The SMTP
+          // sender's own address goes in `to` (set by the mailer when omitted).
+          const mailResult = await sendMail({
+            bcc: emailRecipients.map((u) => u.email),
+            subject,
+            html,
+            text
+          });
+          if (mailResult.ok) {
+            await prisma.alertEvent.update({
+              where: { id: event.id },
+              data: { status: "DELIVERED", deliveredAt: new Date() }
+            });
+            results.push({
+              ruleId: rule.id,
+              triggered: true,
+              emailSent: true,
+              emailRecipients: emailRecipients.length
+            });
+            continue;
+          }
+          console.error("[evaluate-alerts] sendMail failed:", mailResult.reason);
+          results.push({
+            ruleId: rule.id,
+            triggered: true,
+            emailSent: false,
+            emailError: mailResult.reason,
+            emailRecipients: emailRecipients.length
+          });
+          continue;
         }
       }
     }
