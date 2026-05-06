@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
+import { saveFilterPrefs } from "@/lib/filter-prefs-client";
 
 export default function ReportsHeader({
   projects,
@@ -13,6 +14,7 @@ export default function ReportsHeader({
   const router = useRouter();
 
   function handleChange(projectId: string) {
+    saveFilterPrefs({ projectId });
     router.push(`/reports?projectId=${projectId}`);
   }
 
@@ -26,7 +28,6 @@ export default function ReportsHeader({
         projects={projects}
         value={selectedProjectId}
         onChange={handleChange}
-        persistKey="mdh:reports:selectedProjectId"
       />
     </div>
   );

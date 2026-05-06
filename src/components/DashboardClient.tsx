@@ -13,10 +13,7 @@ import {
 } from "@/components/skeletons";
 import Skeleton from "@/components/Skeleton";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import {
-  readDateRangePreference,
-  saveDateRangePreference
-} from "@/lib/date-range-preference";
+import { saveFilterPrefs, type FilterPrefs } from "@/lib/filter-prefs-client";
 import FlashMessage from "@/components/FlashMessage";
 import {
   Area,
@@ -246,10 +243,14 @@ function TrendArea({
 
 export default function DashboardClient({
   projects,
-  initialDashboard
+  initialDashboard,
+  initialProjectId,
+  initialFilterPrefs
 }: {
   projects: { id: string; name: string }[];
   initialDashboard: DashboardPayload | null;
+  initialProjectId?: string | null;
+  initialFilterPrefs?: FilterPrefs;
 }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(initialDashboard);
   const [coreLoading, setCoreLoading] = useState(false);
@@ -257,35 +258,33 @@ export default function DashboardClient({
   const [highlightsLoading, setHighlightsLoading] = useState(false);
   const [coreError, setCoreError] = useState<string | null>(null);
   const [activeMetric, setActiveMetric] = useState<MetricKey>("sessions");
-  const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? "");
-  const [range, setRange] = useState<RangeKey>("last30");
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    initialProjectId ?? projects[0]?.id ?? ""
+  );
+  const initialRangeKey = (initialFilterPrefs?.dateRange?.range ?? "last30") as RangeKey;
+  const [range, setRange] = useState<RangeKey>(initialRangeKey);
   const [compare, setCompare] = useState(false);
-  const initialRange = resolveRange("last30");
-  const [customStart, setCustomStart] = useState(initialRange.start);
-  const [customEnd, setCustomEnd] = useState(initialRange.end);
+  const initialRangeBounds =
+    initialRangeKey === "custom" &&
+    initialFilterPrefs?.dateRange?.start &&
+    initialFilterPrefs?.dateRange?.end
+      ? { start: initialFilterPrefs.dateRange.start, end: initialFilterPrefs.dateRange.end }
+      : resolveRange(initialRangeKey === "custom" ? "last30" : initialRangeKey);
+  const [customStart, setCustomStart] = useState(initialRangeBounds.start);
+  const [customEnd, setCustomEnd] = useState(initialRangeBounds.end);
   const [filterError, setFilterError] = useState<string | null>(null);
   const restoredPreferenceRef = useRef(false);
 
   useEffect(() => {
     if (restoredPreferenceRef.current) return;
     restoredPreferenceRef.current = true;
-    const saved = readDateRangePreference("dashboard");
-    if (saved) {
-      setRange(saved.range);
-      if (saved.range === "custom" && saved.start && saved.end) {
-        setCustomStart(saved.start);
-        setCustomEnd(saved.end);
-        void applyRange({
-          rangeOverride: "custom",
-          customStartOverride: saved.start,
-          customEndOverride: saved.end
-        });
-        return;
-      }
-      if (saved.range !== "last30") {
-        void applyRange({ rangeOverride: saved.range });
-        return;
-      }
+    if (initialRangeKey !== "last30") {
+      void applyRange({
+        rangeOverride: initialRangeKey,
+        customStartOverride: initialRangeKey === "custom" ? initialRangeBounds.start : undefined,
+        customEndOverride: initialRangeKey === "custom" ? initialRangeBounds.end : undefined
+      });
+      return;
     }
     // Default first render: KPIs/trend and realtime come pre-populated from the
     // server, but highlights are not pre-fetched. Stream them in independently.
@@ -343,10 +342,13 @@ export default function DashboardClient({
       start = resolved.start;
       end = resolved.end;
     }
-    saveDateRangePreference("dashboard", {
-      range: effectiveRange,
-      start: effectiveRange === "custom" ? start : undefined,
-      end: effectiveRange === "custom" ? end : undefined
+    saveFilterPrefs({
+      projectId,
+      dateRange: {
+        range: effectiveRange,
+        start: effectiveRange === "custom" ? start : undefined,
+        end: effectiveRange === "custom" ? end : undefined
+      }
     });
     const baseParams: Record<string, string> = { projectId, start, end };
     const coreParams = new URLSearchParams(baseParams);
@@ -503,7 +505,6 @@ export default function DashboardClient({
               projects={projects}
               value={selectedProjectId}
               onChange={handleChange}
-              persistKey="mdh:dashboard:selectedProjectId"
             />
           ) : null}
           <select

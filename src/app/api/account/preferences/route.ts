@@ -1,12 +1,31 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-helpers";
+import {
+  filterPrefsSchema,
+  mergeUserFilterPrefs,
+  readUserFilterPrefs
+} from "@/lib/filter-prefs";
 
 const schema = z.object({
   locale: z.enum(["en", "de"]).optional(),
-  theme: z.enum(["light", "dark"]).optional()
+  theme: z.enum(["light", "dark"]).optional(),
+  filterPrefs: filterPrefsSchema.optional()
 });
+
+export async function GET() {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const filterPrefs = await readUserFilterPrefs(sessionUser.id);
+  return NextResponse.json({
+    locale: sessionUser.locale ?? "en",
+    theme: sessionUser.theme ?? "light",
+    filterPrefs
+  });
+}
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -20,13 +39,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  await prisma.user.update({
-    where: { id: sessionUser.id },
-    data: {
-      locale: parsed.data.locale ?? sessionUser.locale ?? "en",
-      theme: parsed.data.theme ?? sessionUser.theme ?? "light"
-    }
-  });
+  const updateData: { locale?: string; theme?: string } = {};
+  if (parsed.data.locale) updateData.locale = parsed.data.locale;
+  if (parsed.data.theme) updateData.theme = parsed.data.theme;
+  if (Object.keys(updateData).length) {
+    await prisma.user.update({ where: { id: sessionUser.id }, data: updateData });
+  }
 
-  return NextResponse.json({ ok: true });
+  let filterPrefs = undefined;
+  if (parsed.data.filterPrefs) {
+    filterPrefs = await mergeUserFilterPrefs(sessionUser.id, parsed.data.filterPrefs);
+  }
+
+  return NextResponse.json({ ok: true, filterPrefs });
 }

@@ -1,12 +1,13 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { addDays, formatDateShort } from "@/lib/time";
+import { formatDateShort } from "@/lib/time";
 import { fetchGa4EcommerceReport, fetchGa4ReportDetail } from "@/lib/ga4";
 import { getOrRefreshReport } from "@/lib/report-cache";
 import { reportDetailMap } from "@/lib/report-config";
 import ReportsFilters from "@/components/ReportsFilters";
 import ReportsDataTable from "@/components/ReportsDataTable";
+import { resolveFiltersFromRequest } from "@/lib/resolve-filters";
 
 const reportMap = reportDetailMap;
 
@@ -31,13 +32,19 @@ export default async function ReportsDetailPage({
     orderBy: { createdAt: "desc" }
   });
 
-  const selectedId = resolvedSearchParams?.projectId ?? projects[0]?.id;
-  if (!selectedId) {
+  if (!projects.length) {
     return <div className="alert">No projects available. Import GA4 properties first.</div>;
   }
 
+  const filters = await resolveFiltersFromRequest({
+    userId: user.id,
+    projects,
+    searchParams: resolvedSearchParams
+  });
+  if (!filters) return <div className="alert">No projects available.</div>;
+
   const project = await prisma.project.findUnique({
-    where: { id: selectedId },
+    where: { id: filters.projectId },
     include: { dataSources: true }
   });
 
@@ -57,17 +64,10 @@ export default async function ReportsDetailPage({
   const reportKey = resolvedParams.key;
   const report = reportMap[reportKey as keyof typeof reportMap];
 
-  const rangeKey = resolvedSearchParams?.range ?? "last30";
+  const rangeKey = filters.rangeKey;
   const refresh = resolvedSearchParams?.refresh === "1";
-  const reportEnd = resolvedSearchParams?.end ? new Date(resolvedSearchParams.end) : new Date();
-  let reportStart = resolvedSearchParams?.start ? new Date(resolvedSearchParams.start) : addDays(reportEnd, -29);
-  if (rangeKey === "last7") {
-    reportStart = addDays(reportEnd, -6);
-  } else if (rangeKey === "last90") {
-    reportStart = addDays(reportEnd, -89);
-  } else if (rangeKey === "month") {
-    reportStart = new Date(reportEnd.getFullYear(), reportEnd.getMonth(), 1);
-  }
+  const reportEnd = filters.end;
+  const reportStart = filters.start;
 
   const ga4Source = project.dataSources.find((item) => item.type === "GA4");
   const ga4Integration = await prisma.integrationSetting.findUnique({ where: { type: "GA4" } });
@@ -142,7 +142,7 @@ export default async function ReportsDetailPage({
         projects={projects.map((item) => ({ id: item.id, name: item.name }))}
         selectedProjectId={project.id}
         report="snapshot"
-        range={rangeKey as any}
+        range={rangeKey}
         start={formatDateShort(reportStart)}
         end={formatDateShort(reportEnd)}
         basePath={`/reports/${reportKey}`}

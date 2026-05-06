@@ -25,3 +25,4 @@ compose.override.yml
 docker-data/
 pgdata/
 postgres-data/
+Google-Analytics-Dashboard.html

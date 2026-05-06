@@ -4,6 +4,7 @@ import DashboardClient from "@/components/DashboardClient";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchGa4Realtime } from "@/lib/ga4";
+import { readUserFilterPrefs } from "@/lib/filter-prefs";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -18,7 +19,12 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" }
   });
 
-  const project = projects[0] ?? null;
+  const prefs = await readUserFilterPrefs(user.id);
+  const preferredProject = prefs.projectId
+    ? projects.find((item) => item.id === prefs.projectId) ?? null
+    : null;
+  const project = preferredProject ?? projects[0] ?? null;
+
   const daily = project
     ? await prisma.metricDaily.findMany({
         where: { projectId: project.id, source: "GA4" },
@@ -53,6 +59,8 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       projects={projects.map((item) => ({ id: item.id, name: item.name }))}
+      initialProjectId={project?.id ?? null}
+      initialFilterPrefs={prefs}
       initialDashboard={
         project
           ? {

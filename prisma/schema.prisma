@@ -76,6 +76,7 @@ model User {
   notificationsEnabled Boolean @default(false)
   locale       String       @default("en")
   theme        String       @default("light")
+  filterPrefs  Json?
   createdById  String?
   createdAt    DateTime     @default(now())
   projectUsers ProjectUser[]

@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
 import { addDays, formatLocalDate } from "@/lib/time";
-import {
-  readDateRangePreference,
-  saveDateRangePreference
-} from "@/lib/date-range-preference";
+import { saveFilterPrefs } from "@/lib/filter-prefs-client";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -45,9 +42,7 @@ export default function AdsIntelligenceFilters({
   range,
   start,
   end,
-  basePath = "/ads",
-  urlHadRange = true,
-  preferenceScope = "ads"
+  basePath = "/ads"
 }: {
   projects: { id: string; name: string }[];
   selectedProjectId: string;
@@ -55,15 +50,12 @@ export default function AdsIntelligenceFilters({
   start: string;
   end: string;
   basePath?: string;
-  urlHadRange?: boolean;
-  preferenceScope?: string;
 }) {
   const router = useRouter();
   const [selectedRange, setSelectedRange] = useState<RangeKey>(range);
   const [customStart, setCustomStart] = useState(start);
   const [customEnd, setCustomEnd] = useState(end);
   const [error, setError] = useState<string | null>(null);
-  const restoredPreferenceRef = useRef(false);
 
   function pushFilters({
     projectId,
@@ -76,10 +68,13 @@ export default function AdsIntelligenceFilters({
     startDate: string;
     endDate: string;
   }) {
-    saveDateRangePreference(preferenceScope, {
-      range: rangeKey,
-      start: rangeKey === "custom" ? startDate : undefined,
-      end: rangeKey === "custom" ? endDate : undefined
+    saveFilterPrefs({
+      projectId,
+      dateRange: {
+        range: rangeKey,
+        start: rangeKey === "custom" ? startDate : undefined,
+        end: rangeKey === "custom" ? endDate : undefined
+      }
     });
     const params = new URLSearchParams({
       projectId,
@@ -124,26 +119,6 @@ export default function AdsIntelligenceFilters({
     });
   }
 
-  useEffect(() => {
-    if (restoredPreferenceRef.current) return;
-    restoredPreferenceRef.current = true;
-    if (urlHadRange) return;
-    const saved = readDateRangePreference(preferenceScope);
-    if (!saved) return;
-    if (saved.range === "custom" && saved.start && saved.end) {
-      setSelectedRange("custom");
-      setCustomStart(saved.start);
-      setCustomEnd(saved.end);
-      apply({ rangeKey: "custom", startDate: saved.start, endDate: saved.end });
-      return;
-    }
-    if (saved.range !== range) {
-      setSelectedRange(saved.range);
-      apply({ rangeKey: saved.range });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -158,7 +133,6 @@ export default function AdsIntelligenceFilters({
             projects={projects}
             value={selectedProjectId}
             onChange={(projectId) => apply({ projectId })}
-            persistKey="mdh:ads:selectedProjectId"
           />
           <select
             className="input max-w-[180px] min-w-[140px]"

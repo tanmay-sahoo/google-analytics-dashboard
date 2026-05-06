@@ -1,16 +1,16 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { addDays, formatDateShort } from "@/lib/time";
+import { formatDateShort } from "@/lib/time";
 import { getOrRefreshReport } from "@/lib/report-cache";
 import { fetchAdsIntelligence, type AdsBreakdownRow, type AdsIntelligenceData } from "@/lib/ads-intelligence";
 import { fetchGa4CityMetrics, type Ga4CityRow } from "@/lib/ga4";
 import AdsIntelligenceFilters from "@/components/AdsIntelligenceFilters";
 import ReportsDataTable from "@/components/ReportsDataTable";
+import { resolveFiltersFromRequest } from "@/lib/resolve-filters";
 
 const GA4_CITY_KEY = "locations-city";
 
-type RangeKey = "last7" | "last30" | "last90" | "month" | "custom";
 type FormatType = "number" | "currency";
 
 function normalizeAdsData(data: AdsIntelligenceData | null): AdsIntelligenceData | null {
@@ -147,17 +147,6 @@ function toRows(rows: AdsBreakdownRow[], selector: (row: AdsBreakdownRow) => num
   }));
 }
 
-function resolveRange(range: RangeKey, startParam?: string, endParam?: string) {
-  const end = endParam ? new Date(endParam) : new Date();
-  let start = startParam ? new Date(startParam) : addDays(end, -29);
-  if (range === "last7") start = addDays(end, -6);
-  else if (range === "last30") start = addDays(end, -29);
-  else if (range === "last90") start = addDays(end, -89);
-  else if (range === "month") start = new Date(end.getFullYear(), end.getMonth(), 1);
-
-  return { start, end };
-}
-
 export default async function AdsDetailPage({
   params,
   searchParams
@@ -165,7 +154,7 @@ export default async function AdsDetailPage({
   params: Promise<{ key: string }>;
   searchParams?: Promise<{
     projectId?: string;
-    range?: RangeKey;
+    range?: string;
     start?: string;
     end?: string;
     refresh?: string;
@@ -193,8 +182,14 @@ export default async function AdsDetailPage({
     return <div className="alert">No projects available yet.</div>;
   }
 
-  const selectedProjectId = resolvedSearchParams?.projectId ?? projects[0].id;
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
+  const filters = await resolveFiltersFromRequest({
+    userId: user.id,
+    projects,
+    searchParams: resolvedSearchParams
+  });
+  if (!filters) return <div className="alert">No projects available yet.</div>;
+
+  const selectedProject = projects.find((project) => project.id === filters.projectId) ?? projects[0];
 
   if (user.role !== "ADMIN") {
     const access = await prisma.projectUser.findUnique({
@@ -205,8 +200,8 @@ export default async function AdsDetailPage({
     }
   }
 
-  const rangeKey = (resolvedSearchParams?.range ?? "last30") as RangeKey;
-  const { start, end } = resolveRange(rangeKey, resolvedSearchParams?.start, resolvedSearchParams?.end);
+  const rangeKey = filters.rangeKey;
+  const { start, end } = filters;
   const forceRefresh = resolvedSearchParams?.refresh === "1";
 
   const adsSource = selectedProject.dataSources.find((item) => item.type === "ADS")?.externalId;

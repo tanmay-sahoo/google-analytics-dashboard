@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { apiUrl } from "@/lib/base-path";
 import { useRouter } from "next/navigation";
 import ProjectSelector from "@/components/ProjectSelector";
 import { addDays, formatLocalDate } from "@/lib/time";
 import DateRangePicker from "@/components/DateRangePicker";
 import FlashMessage from "@/components/FlashMessage";
-import {
-  readDateRangePreference,
-  saveDateRangePreference
-} from "@/lib/date-range-preference";
+import { saveFilterPrefs } from "@/lib/filter-prefs-client";
 
 const rangeOptions = [
   { key: "last7", label: "Last 7 days" },
@@ -30,9 +27,7 @@ export default function ReportsFilters({
   start,
   end,
   refresh,
-  basePath = "/reports",
-  urlHadRange = true,
-  preferenceScope = "reports"
+  basePath = "/reports"
 }: {
   projects: { id: string; name: string }[];
   selectedProjectId: string;
@@ -42,15 +37,12 @@ export default function ReportsFilters({
   end: string;
   refresh?: string;
   basePath?: string;
-  urlHadRange?: boolean;
-  preferenceScope?: string;
 }) {
   const router = useRouter();
   const [customStart, setCustomStart] = useState(start);
   const [customEnd, setCustomEnd] = useState(end);
   const [selectedRange, setSelectedRange] = useState<RangeKey>(range);
   const [error, setError] = useState<string | null>(null);
-  const restoredPreferenceRef = useRef(false);
 
   function resolveRangeDates(rangeKey: RangeKey) {
     const endDate = new Date();
@@ -128,7 +120,7 @@ export default function ReportsFilters({
         return;
       }
     } else {
-      const resolved = resolveRangeDates(selectedRange);
+      const resolved = resolveRangeDates(effectiveRange);
       nextStart = resolved.start;
       nextEnd = resolved.end;
     }
@@ -144,10 +136,13 @@ export default function ReportsFilters({
     } else if (refresh) {
       params.set("refresh", refresh);
     }
-    saveDateRangePreference(preferenceScope, {
-      range: effectiveRange,
-      start: effectiveRange === "custom" ? nextStart : undefined,
-      end: effectiveRange === "custom" ? nextEnd : undefined
+    saveFilterPrefs({
+      projectId: nextProjectId,
+      dateRange: {
+        range: effectiveRange,
+        start: effectiveRange === "custom" ? nextStart : undefined,
+        end: effectiveRange === "custom" ? nextEnd : undefined
+      }
     });
     void prefetchReports({
       projectId: nextProjectId,
@@ -157,30 +152,6 @@ export default function ReportsFilters({
     });
     router.push(`${basePath}?${params.toString()}`);
   }
-
-  useEffect(() => {
-    if (restoredPreferenceRef.current) return;
-    restoredPreferenceRef.current = true;
-    if (urlHadRange) return;
-    const saved = readDateRangePreference(preferenceScope);
-    if (!saved) return;
-    if (saved.range === "custom" && saved.start && saved.end) {
-      setSelectedRange("custom");
-      setCustomStart(saved.start);
-      setCustomEnd(saved.end);
-      applyFilters({
-        rangeOverride: "custom",
-        customStartOverride: saved.start,
-        customEndOverride: saved.end
-      });
-      return;
-    }
-    if (saved.range !== range) {
-      setSelectedRange(saved.range);
-      applyFilters({ rangeOverride: saved.range });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function handleProjectChange(projectId: string) {
     applyFilters({ nextProjectId: projectId });
@@ -198,7 +169,6 @@ export default function ReportsFilters({
             projects={projects}
             value={selectedProjectId}
             onChange={handleProjectChange}
-            persistKey="mdh:reports:selectedProjectId"
           />
           <select
             className="input max-w-[180px] min-w-[140px]"

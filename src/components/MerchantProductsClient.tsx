@@ -455,6 +455,11 @@ export default function MerchantProductsClient({
                             const linkedProject = projects.find((item) => item.merchantId === account.id);
                             if (linkedProject) {
                               setSelectedProjectId(linkedProject.id);
+                              void fetch(apiUrl("/api/account/preferences"), {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ filterPrefs: { projectId: linkedProject.id } })
+                              }).catch(() => {});
                             }
                             setSelectedMerchantId(account.id);
                             setTab("products");
@@ -491,7 +496,15 @@ export default function MerchantProductsClient({
                     <select
                       className="input min-w-[220px]"
                       value={selectedProjectId}
-                      onChange={(event) => setSelectedProjectId(event.target.value)}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setSelectedProjectId(next);
+                        void fetch(apiUrl("/api/account/preferences"), {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ filterPrefs: { projectId: next } })
+                        }).catch(() => {});
+                      }}
                     >
                       {projects.map((project) => (
                         <option key={project.id} value={project.id}>
